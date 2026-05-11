@@ -865,7 +865,17 @@ $('#name-modal-input').addEventListener('keydown', (e) => {
 
 // --- Socket setup ---
 function connect() {
-  state.socket = io({ transports: ['websocket', 'polling'] });
+  state.socket = io({
+    transports: ['websocket', 'polling'],
+    // Aggressively reconnect on disconnect — phones drop sockets all the time
+    // (background tab, screen-lock, wifi handoff). The user shouldn't notice.
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
+    randomizationFactor: 0.3,
+    timeout: 20000
+  });
   state.socket.on('lobby', renderLobbyState);
   state.socket.on('state', renderState);
   state.socket.on('chat', onChatMessage);
@@ -883,14 +893,42 @@ function connect() {
     Sounds.play('peerBack');
     addSystemChat(`${display} rejoined`);
   });
-  state.socket.on('disconnect', () => toast('Disconnected from server', true));
+  state.socket.on('disconnect', (reason) => {
+    // 'io server disconnect' is intentional (server kicked us); everything else
+    // is a network/transport blip and the client will auto-reconnect.
+    if (reason === 'io server disconnect') {
+      toast('Disconnected by server', true);
+    } else {
+      showPeerStatus('Reconnecting…', false);
+    }
+  });
   state.socket.on('connect', () => {
-    if (autoJoinRoom && !state.code) {
-      // Always confirm the name when arriving via a share link — even if one is saved,
-      // since it could be a different person on this device.
+    // If we already have a room/name in this tab, we got reconnected after a blip.
+    // Ask the server to put us back in the same slot so the user's game continues
+    // without them having to do anything.
+    if (state.code && state.myName) {
+      state.socket.emit('rejoin', { code: state.code, name: state.myName }, (res) => {
+        if (res && res.ok) {
+          hidePeerStatus();
+        } else if (res && /Room not found|No matching slot/i.test(res.reason || '')) {
+          // Server lost the room (e.g. restarted while we were gone). Soft-reload to lobby.
+          toast(res.reason, true);
+        }
+      });
+    } else if (autoJoinRoom && !state.code) {
+      // First-load via share link — confirm name on this device
       openNamePrompt(autoJoinRoom);
     }
   });
 }
 
 connect();
+
+// When the page comes back to the foreground on mobile, force a socket check.
+// iOS Safari pauses background tabs and the socket can be silently dead until
+// the next ping; nudging it on visibilitychange makes recovery much faster.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && state.socket && !state.socket.connected) {
+    state.socket.connect();
+  }
+});

@@ -7,6 +7,7 @@ const express = require('express');
 const { Server } = require('socket.io');
 
 const game = require('./game');
+const og = require('./og');
 
 const PORT = process.env.PORT || 3000;
 
@@ -28,6 +29,111 @@ app.use((req, res, next) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
   next();
 });
+
+// --- Open Graph / Twitter card images ---
+// Cache rendered PNGs in memory so messengers (which hit the URL multiple times)
+// don't trigger repeated SVG → PNG renders.
+const ogCache = new Map();
+const OG_CACHE_LIMIT = 200;
+
+function ogCacheGet(key) { return ogCache.get(key); }
+function ogCacheSet(key, buf) {
+  if (ogCache.size >= OG_CACHE_LIMIT) ogCache.delete(ogCache.keys().next().value);
+  ogCache.set(key, buf);
+}
+
+function sendPng(res, buf) {
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+  res.end(buf);
+}
+
+app.get('/og.png', (req, res) => {
+  try {
+    let buf = ogCacheGet('home');
+    if (!buf) {
+      buf = og.renderPNG(og.homepageOG());
+      ogCacheSet('home', buf);
+    }
+    sendPng(res, buf);
+  } catch (e) {
+    console.error('og home render failed:', e.message);
+    res.status(500).end();
+  }
+});
+
+app.get('/og/invite.png', (req, res) => {
+  try {
+    const code = (req.query.room || '').toString().toUpperCase().slice(0, 4);
+    const room = code && rooms.get(code);
+    const inviterName = (room && room.players[0] && room.players[0].name) || 'A friend';
+    const key = `invite:${code}:${inviterName}`;
+    let buf = ogCacheGet(key);
+    if (!buf) {
+      buf = og.renderPNG(og.inviteOG(inviterName, code));
+      ogCacheSet(key, buf);
+    }
+    sendPng(res, buf);
+  } catch (e) {
+    console.error('og invite render failed:', e.message);
+    res.status(500).end();
+  }
+});
+
+// --- Root: serve index.html with OG tags rewritten for invite vs homepage ---
+const INDEX_HTML_PATH = path.join(__dirname, 'public', 'index.html');
+let _indexHtmlCache = null;
+function indexHtml() {
+  if (!_indexHtmlCache) _indexHtmlCache = fs.readFileSync(INDEX_HTML_PATH, 'utf8');
+  return _indexHtmlCache;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[ch]));
+}
+
+function ogTags({ title, description, imageUrl }) {
+  return `<meta property="og:type" content="website" />
+<meta property="og:title" content="${escapeHtml(title)}" />
+<meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:image" content="${escapeHtml(imageUrl)}" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(title)}" />
+<meta name="twitter:description" content="${escapeHtml(description)}" />
+<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />`;
+}
+
+app.get('/', (req, res) => {
+  const room = (req.query.room || '').toString().toUpperCase().slice(0, 4);
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  let tags;
+  if (room) {
+    const r = rooms.get(room);
+    const inviter = (r && r.players[0] && r.players[0].name) || 'A friend';
+    tags = ogTags({
+      title: `${inviter} invited you to elbbarcs`,
+      description: `Tap to join room ${room}.`,
+      imageUrl: `${baseUrl}/og/invite.png?room=${encodeURIComponent(room)}`
+    });
+  } else {
+    tags = ogTags({
+      title: 'elbbarcs',
+      description: 'two players · one phone · love for words',
+      imageUrl: `${baseUrl}/og.png`
+    });
+  }
+  const html = indexHtml().replace(
+    /<!--OG_TAGS_START-->[\s\S]*?<!--OG_TAGS_END-->/,
+    `<!--OG_TAGS_START-->\n${tags}\n<!--OG_TAGS_END-->`
+  );
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.end(html);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ ok: true, words: dictionary.size }));
 
@@ -80,7 +186,16 @@ async function lookupWords(words) {
 }
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+  cors: { origin: '*' },
+  // Be patient with mobile clients: phones aggressively suspend background tabs,
+  // so default 20s timeouts cause unnecessary disconnects on every screen-lock.
+  pingInterval: 25000,
+  pingTimeout: 60000,
+  // Allow both transports so flaky networks can fall back from websocket to polling
+  // without the user noticing.
+  transports: ['websocket', 'polling']
+});
 
 /**
  * Rooms map: code -> {
