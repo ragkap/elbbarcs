@@ -147,9 +147,35 @@ io.on('connection', (socket) => {
     const room = rooms.get(code);
     if (!room) return ack && ack({ ok: false, reason: 'Room not found' });
     if (room.state) return ack && ack({ ok: false, reason: 'Game already started' });
+    const safeName = (name || 'Player 2').slice(0, 16);
+
+    // If a vacant slot exists with the same name, treat this as a reconnect
+    // (mobile tab-switch, network blip, etc.)
+    const vacantSameName = room.players.findIndex(p => !p.socketId && p.name === safeName);
+    if (vacantSameName >= 0) {
+      room.players[vacantSameName].socketId = socket.id;
+      joinedRoom = code;
+      socket.join(code);
+      ack && ack({ ok: true, code, you: vacantSameName });
+      broadcastRoom(room);
+      return;
+    }
+
+    // If a vacant slot exists (different name), take it
+    const vacantAny = room.players.findIndex(p => !p.socketId);
+    if (vacantAny >= 0) {
+      playerId = socket.id + '-' + Date.now();
+      room.players[vacantAny] = { id: playerId, name: safeName, socketId: socket.id };
+      joinedRoom = code;
+      socket.join(code);
+      ack && ack({ ok: true, code, you: vacantAny });
+      broadcastRoom(room);
+      return;
+    }
+
     if (room.players.length >= 2) return ack && ack({ ok: false, reason: 'Room full' });
     playerId = socket.id + '-' + Date.now();
-    room.players.push({ id: playerId, name: (name || 'Player 2').slice(0, 16), socketId: socket.id });
+    room.players.push({ id: playerId, name: safeName, socketId: socket.id });
     joinedRoom = code;
     socket.join(code);
     ack && ack({ ok: true, code, you: room.players.length - 1 });
@@ -281,10 +307,21 @@ io.on('connection', (socket) => {
     const idx = findPlayerIndex(room, socket.id);
     if (idx < 0) return;
     if (!room.state) {
-      // Pre-game: remove the player so room can still be filled
-      room.players.splice(idx, 1);
-      if (room.players.length === 0) rooms.delete(room.code);
-      else broadcastRoom(room);
+      // Pre-game: keep the slot but mark socket as null so the host can come back
+      // (e.g. mobile tab switch, network blip, refresh after sharing the link).
+      // Clean up the room only if no one reconnects within 5 minutes.
+      room.players[idx].socketId = null;
+      // If everyone has dropped, schedule a cleanup
+      if (room.players.every(p => !p.socketId)) {
+        setTimeout(() => {
+          if (rooms.get(room.code) === room && room.players.every(p => !p.socketId)) {
+            rooms.delete(room.code);
+            console.log(`[room] cleaned up idle pre-game room ${room.code}`);
+          }
+        }, 5 * 60 * 1000);
+      } else {
+        broadcastRoom(room);
+      }
     } else {
       // Mid-game: keep slot, mark disconnected; allow re-join via the same code+name
       room.players[idx].socketId = null;
