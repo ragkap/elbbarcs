@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#143524" />
+<title>elbbarcs</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/favicon.svg" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- LOBBY -->
+    <section id="lobby" class="screen active">
+      <h1 class="logo"><svg class="tile-icon logo-tile" viewBox="0 0 32 32" aria-hidden="true">
+          <rect x="2" y="2" width="28" height="28" rx="4" ry="4" fill="#f1d899" stroke="#b08d4a" stroke-width="1.5"/>
+          <text x="11" y="22" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="16" font-weight="700" fill="#2a1d05">E</text>
+          <text x="22" y="27" font-size="7" font-weight="700" fill="#2a1d05">1</text>
+        </svg>lbbarcs</h1>
+      <p class="tagline">two players · one phone · love for words</p>
+      <p id="autojoin-status" class="autojoin-status">Joining game…</p>
+
+      <div class="card">
+        <label>Your name
+          <input id="name-input" maxlength="16" placeholder="e.g. Alice" autocomplete="off" />
+        </label>
+        <button id="create-btn" class="primary">Create new game</button>
+        <div class="divider"><span>or</span></div>
+        <label>Room code
+          <input id="code-input" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" />
+        </label>
+        <button id="join-btn" class="primary">Join game</button>
+      </div>
+
+      <p class="footer dedication">For my wife.<br>My favourite word, best teammate, and highest-scoring move in life.</p>
+    </section>
+
+    <!-- WAITING ROOM -->
+    <section id="waiting" class="screen">
+      <h2>Room <span id="room-code" class="code"></span></h2>
+      <p id="waiting-hint">Share this code with your opponent.</p>
+      <div id="share-row" class="share-row">
+        <button id="copy-link-btn" class="ghost">📋 Copy link</button>
+        <button id="share-btn" class="ghost">↗ Share via app…</button>
+      </div>
+      <div id="players-list" class="players"></div>
+      <button id="start-btn" class="primary" disabled>Start game</button>
+      <button id="leave-btn" class="ghost">Leave</button>
+      <button id="sound-toggle" class="ghost small">🔊 Sound: on</button>
+    </section>
+
+    <!-- GAME -->
+    <section id="game" class="screen">
+      <header class="topbar">
+        <div class="scoreboard">
+          <div class="score" id="p0-score"><span class="name"></span><span class="val">0</span></div>
+          <div class="bag-info">
+            <div class="bag-count" id="bag-count">100</div>
+            <div class="bag-label">in bag</div>
+          </div>
+          <div class="score" id="p1-score"><span class="name"></span><span class="val">0</span></div>
+        </div>
+        <div class="turn-indicator" id="turn-indicator">Waiting…</div>
+      </header>
+
+      <div class="board-wrap">
+        <div id="board" class="board"></div>
+      </div>
+
+      <div class="rack-area">
+        <div id="rack" class="rack"></div>
+        <div class="actions">
+          <button id="recall-btn" title="Return tiles to rack">↺ Recall</button>
+          <button id="shuffle-btn" title="Shuffle rack">⇄ Shuffle</button>
+          <button id="exchange-btn" title="Exchange tiles">⇆ Exchange</button>
+          <button id="pass-btn" title="Pass turn">Pass</button>
+          <button id="play-btn" class="primary" title="Submit word">Play</button>
+        </div>
+      </div>
+
+      <div id="message" class="message"></div>
+
+      <div class="floating-controls">
+        <button id="chat-toggle" class="ghost small">💬 Chat<span id="chat-badge" class="badge hidden">0</span></button>
+      </div>
+
+      <div id="chat-panel" class="chat-panel hidden">
+        <header class="chat-header">
+          <h3>Chat</h3>
+          <button id="chat-close" class="ghost small">Close</button>
+        </header>
+        <ul id="chat-messages" class="chat-messages"></ul>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" type="text" maxlength="200" placeholder="Say something…" autocomplete="off" />
+          <button type="submit" class="primary">Send</button>
+        </form>
+      </div>
+
+      <div id="peer-status" class="peer-status hidden"></div>
+
+      <div id="definitions" class="definitions hidden">
+        <header class="def-header">
+          <span class="def-title">📖 <span id="def-title-text">Definition</span></span>
+          <button id="def-close" class="ghost small">×</button>
+        </header>
+        <div id="def-body" class="def-body"></div>
+      </div>
+    </section>
+
+    <!-- BLANK PICKER MODAL -->
+    <div id="blank-modal" class="modal hidden">
+      <div class="modal-card">
+        <h3>Choose a letter for the blank</h3>
+        <div id="blank-letters" class="blank-grid"></div>
+        <button id="blank-cancel" class="ghost">Cancel</button>
+      </div>
+    </div>
+
+    <!-- EXCHANGE MODAL -->
+    <div id="exchange-modal" class="modal hidden">
+      <div class="modal-card">
+        <h3>Tap tiles to exchange</h3>
+        <div id="exchange-tiles" class="exchange-grid"></div>
+        <div class="row">
+          <button id="exchange-confirm" class="primary">Exchange</button>
+          <button id="exchange-cancel" class="ghost">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- NAME PROMPT MODAL (for ?room= deep-link arrivals without a saved name) -->
+    <div id="name-modal" class="modal hidden">
+      <div class="modal-card">
+        <h3>Join game <span id="name-modal-code" class="code"></span></h3>
+        <label>Your name
+          <input id="name-modal-input" maxlength="16" placeholder="e.g. Bob" autocomplete="off" />
+        </label>
+        <div class="row">
+          <button id="name-modal-confirm" class="primary">Join</button>
+          <button id="name-modal-cancel" class="ghost">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAME OVER MODAL -->
+    <div id="end-modal" class="modal hidden">
+      <div class="modal-card">
+        <h3 id="end-title">Game over</h3>
+        <div id="end-scores"></div>
+        <button id="end-rematch" class="primary">Back to lobby</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/sounds.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

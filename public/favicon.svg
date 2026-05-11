@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect x="2" y="2" width="28" height="28" rx="4" ry="4" fill="#f1d899" stroke="#b08d4a" stroke-width="1.5"/>
+  <text x="11" y="22" font-family="-apple-system,Segoe UI,Roboto,sans-serif" font-size="16" font-weight="700" fill="#2a1d05">E</text>
+  <text x="22" y="27" font-size="7" font-weight="700" fill="#2a1d05">1</text>
+</svg>
