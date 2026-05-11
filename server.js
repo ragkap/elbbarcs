@@ -174,31 +174,43 @@ io.on('connection', (socket) => {
     const me = findPlayerIndex(room, socket.id);
     if (me !== room.state.turn) return ack && ack({ ok: false, reason: 'Not your turn' });
 
-    // Verify each placement comes from this player's rack and the rackIndex is in range
+    // Match each placement to a tile in the player's rack by letter (or blank).
+    // We resolve rackIndex server-side so client-side rack reordering (shuffle) doesn't
+    // desync — the client just tells us "this is the letter I want to play, and I think
+    // it's at index N". If index N has the right letter we use it; otherwise we search.
     const rack = room.state.racks[me];
-    const used = new Set();
+    const consumed = new Set();
     for (const p of placements) {
-      if (typeof p.rackIndex !== 'number' || p.rackIndex < 0 || p.rackIndex >= rack.length) {
-        return ack && ack({ ok: false, reason: 'Invalid rack index' });
+      const wantLetter = (p.letter || '').toUpperCase();
+      if (!/^[A-Z]$/.test(wantLetter)) {
+        return ack && ack({ ok: false, reason: 'Bad letter' });
       }
-      if (used.has(p.rackIndex)) {
-        return ack && ack({ ok: false, reason: 'Duplicate rack tile' });
+
+      // What kind of tile to look for: a blank if client said so, else a letter tile.
+      const targetTile = p.blank ? '_' : wantLetter;
+
+      // 1. Try the rackIndex the client suggested
+      let idx = -1;
+      if (typeof p.rackIndex === 'number' && p.rackIndex >= 0 && p.rackIndex < rack.length && !consumed.has(p.rackIndex)) {
+        if (rack[p.rackIndex] === targetTile) idx = p.rackIndex;
       }
-      used.add(p.rackIndex);
-      const rackTile = rack[p.rackIndex];
-      if (rackTile === '_') {
-        // Blank tile: must specify chosen letter
-        if (!p.letter || !/^[A-Z]$/.test(p.letter)) {
-          return ack && ack({ ok: false, reason: 'Blank needs a letter' });
+
+      // 2. Otherwise, find any matching tile in the rack (shuffle made the index stale)
+      if (idx < 0) {
+        for (let i = 0; i < rack.length; i++) {
+          if (consumed.has(i)) continue;
+          if (rack[i] === targetTile) { idx = i; break; }
         }
-        p.blank = true;
-      } else {
-        if (rackTile !== (p.letter || '').toUpperCase()) {
-          return ack && ack({ ok: false, reason: 'Tile mismatch' });
-        }
-        p.blank = false;
-        p.letter = rackTile;
       }
+
+      if (idx < 0) {
+        return ack && ack({ ok: false, reason: p.blank ? 'No blank in rack' : `No ${wantLetter} in rack` });
+      }
+
+      consumed.add(idx);
+      p.rackIndex = idx;
+      p.blank = (rack[idx] === '_');
+      p.letter = wantLetter;
     }
 
     const result = game.validateAndScore(room.state, placements, dictionary);
