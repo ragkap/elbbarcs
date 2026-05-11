@@ -332,7 +332,7 @@ button.flash.error {
 .rack-slot.drop-target { outline: 2px solid var(--accent); }
 
 .actions {
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 4px;
 }
 .actions button { padding: 0.6rem 0.4rem; font-size: 0.8rem; }
@@ -393,21 +393,6 @@ button.flash.error {
   background: var(--tile);
   color: var(--tile-text);
 }
-.exchange-grid {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
-  background: #2a1d05; padding: 6px; border-radius: 8px;
-}
-.exchange-grid .ex-tile {
-  height: 44px;
-  background: var(--tile);
-  color: var(--tile-text);
-  border-radius: 4px;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-  cursor: pointer;
-  position: relative;
-}
-.exchange-grid .ex-tile.selected { outline: 3px solid var(--accent-strong); }
 .row { display: flex; gap: 0.5rem; }
 .row > button { flex: 1; }
 

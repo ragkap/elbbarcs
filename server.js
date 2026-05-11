@@ -24,9 +24,20 @@ const dictionary = new Set();
 }
 
 const app = express();
-// Block search engines at the HTTP-header level too (belt + braces alongside meta + robots.txt).
+// Trust the reverse-proxy (Railway edge) so req.protocol reflects the actual
+// scheme the client used, not the internal http hop. Without this, OG image
+// URLs come out http:// and most social previewers refuse mixed content.
+app.set('trust proxy', true);
+
+// Block search engines on HTML pages — but NOT on the OG image endpoints,
+// since social-media preview scrapers (Slack/Facebook/LinkedIn) treat strict
+// X-Robots-Tag values as a signal to skip the image entirely.
+const OG_IMAGE_PATHS = new Set(['/og.png']);
 app.use((req, res, next) => {
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+  const isOgImage = OG_IMAGE_PATHS.has(req.path) || req.path.startsWith('/og/');
+  if (!isOgImage) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+  }
   next();
 });
 

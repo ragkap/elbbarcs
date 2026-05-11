@@ -585,12 +585,6 @@ $('#pass-btn').addEventListener('click', () => {
     if (!res.ok) return toast(res.reason, true);
   });
 });
-$('#exchange-btn').addEventListener('click', () => {
-  if (state.turn !== state.you) return toast("Not your turn", true);
-  if (state.bagCount < 7) return toast("Bag has < 7 tiles", true);
-  openExchangeModal();
-});
-
 // --- Blank picker ---
 function promptBlank(cb) {
   const grid = $('#blank-letters');
@@ -606,35 +600,6 @@ function promptBlank(cb) {
 }
 function closeBlank() { $('#blank-modal').classList.add('hidden'); }
 $('#blank-cancel').addEventListener('click', closeBlank);
-
-// --- Exchange picker ---
-function openExchangeModal() {
-  const grid = $('#exchange-tiles');
-  grid.innerHTML = '';
-  const selected = new Set();
-  state.rack.forEach((t, i) => {
-    const cell = document.createElement('div');
-    cell.className = 'ex-tile';
-    cell.textContent = t === '_' ? ' ' : t;
-    cell.addEventListener('click', () => {
-      if (selected.has(i)) { selected.delete(i); cell.classList.remove('selected'); }
-      else { selected.add(i); cell.classList.add('selected'); }
-    });
-    cell.dataset.idx = i;
-    grid.appendChild(cell);
-  });
-  const modal = $('#exchange-modal');
-  modal.classList.remove('hidden');
-  $('#exchange-confirm').onclick = () => {
-    if (selected.size === 0) { toast('Pick at least one tile', true); return; }
-    state.socket.emit('exchange', { rackIndices: [...selected] }, (res) => {
-      if (!res.ok) return toast(res.reason, true);
-      modal.classList.add('hidden');
-    });
-  };
-  $('#exchange-cancel').onclick = () => modal.classList.add('hidden');
-}
-
 
 // --- End modal ---
 function showEndModal() {
