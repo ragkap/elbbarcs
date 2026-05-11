@@ -23,6 +23,11 @@ const dictionary = new Set();
 }
 
 const app = express();
+// Block search engines at the HTTP-header level too (belt + braces alongside meta + robots.txt).
+app.use((req, res, next) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ ok: true, words: dictionary.size }));
 
