@@ -131,13 +131,30 @@ async function copyText(text) {
   }
 }
 
-$('#copy-link-btn').addEventListener('click', async () => {
+function flashButton(btn, label, kind = 'success') {
+  const original = btn.dataset.original || btn.innerHTML;
+  btn.dataset.original = original;
+  btn.innerHTML = label;
+  btn.classList.add('flash', kind);
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = btn.dataset.original;
+    btn.classList.remove('flash', 'success', 'error');
+    btn.disabled = false;
+  }, 1400);
+}
+
+$('#copy-link-btn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
   const link = shareLink();
   const ok = await copyText(link);
   Sounds.play(ok ? 'copy' : 'error');
-  toast(ok ? 'Link copied' : 'Copy failed — link: ' + link, !ok);
+  flashButton(btn, ok ? '✓ Copied!' : '✕ Failed', ok ? 'success' : 'error');
+  if (!ok) toast('Copy failed — link: ' + link, true);
 });
-$('#share-btn').addEventListener('click', async () => {
+
+$('#share-btn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
   const link = shareLink();
   const data = {
     title: 'elbbarcs',
@@ -145,12 +162,20 @@ $('#share-btn').addEventListener('click', async () => {
     url: link
   };
   if (navigator.share) {
-    try { await navigator.share(data); Sounds.play('copy'); }
-    catch (e) { /* user dismissed */ }
+    flashButton(btn, '↗ Opening…', 'success');
+    try {
+      await navigator.share(data);
+      Sounds.play('copy');
+      flashButton(btn, '✓ Shared!', 'success');
+    } catch (err) {
+      // User dismissed share sheet — silently restore.
+      flashButton(btn, '↗ Share via app…', 'success');
+    }
   } else {
     const ok = await copyText(link);
     Sounds.play(ok ? 'copy' : 'error');
-    toast(ok ? 'Link copied (no native share)' : 'Copy failed', !ok);
+    flashButton(btn, ok ? '✓ Link copied' : '✕ Failed', ok ? 'success' : 'error');
+    if (!ok) toast('Copy failed', true);
   }
 });
 
