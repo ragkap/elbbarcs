@@ -9,6 +9,8 @@ const { Server } = require('socket.io');
 
 const game = require('./game');
 const og = require('./og');
+const store = require('./store');
+store.init();
 
 const PORT = process.env.PORT || 3000;
 
@@ -243,6 +245,10 @@ function genCode() {
 }
 
 function broadcastRoom(room) {
+  // Persist on every meaningful change. Fire-and-forget — failure is logged,
+  // we don't block the broadcast on a network roundtrip to Upstash.
+  store.saveRoom(room);
+
   if (!room.state) {
     // Lobby update
     for (const p of room.players) {
@@ -459,6 +465,7 @@ io.on('connection', (socket) => {
         setTimeout(() => {
           if (rooms.get(room.code) === room && room.players.every(p => !p.socketId)) {
             rooms.delete(room.code);
+            store.deleteRoom(room.code);
             console.log(`[room] cleaned up idle pre-game room ${room.code}`);
           }
         }, 5 * 60 * 1000);
@@ -468,16 +475,13 @@ io.on('connection', (socket) => {
     } else {
       // Mid-game: keep slot, mark disconnected; allow re-join via the same code+name
       room.players[idx].socketId = null;
+      store.saveRoom(room);
       // Notify the other player
       for (const p of room.players) {
         if (p.socketId) io.to(p.socketId).emit('peer-disconnected', { who: idx });
       }
-      // Clean up empty rooms after 30 minutes
-      setTimeout(() => {
-        if (rooms.get(room.code) === room && room.players.every(p => !p.socketId)) {
-          rooms.delete(room.code);
-        }
-      }, 30 * 60 * 1000);
+      // Don't auto-clean mid-game rooms — let Upstash TTL (24h) handle it so
+      // players who disconnect overnight can pick up where they left off.
     }
   });
 
@@ -506,6 +510,21 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`elbbarcs running on http://localhost:${PORT}`);
-});
+// Hydrate persisted rooms before we accept connections. Best-effort: if Upstash
+// is misconfigured or unreachable, log and start with an empty room map.
+(async () => {
+  try {
+    const persisted = await store.loadAllRooms();
+    for (const room of persisted) {
+      rooms.set(room.code, room);
+    }
+    if (persisted.length) {
+      console.log(`[store] Restored ${persisted.length} room(s) from Upstash.`);
+    }
+  } catch (e) {
+    console.error('[store] Hydration failed:', e.message);
+  }
+  server.listen(PORT, () => {
+    console.log(`elbbarcs running on http://localhost:${PORT}`);
+  });
+})();

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "@upstash/redis": "^1.38.0",
     "compression": "^1.8.1",
     "express": "^4.19.2",
     "socket.io": "^4.7.5",
