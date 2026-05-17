@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const express = require('express');
+const compression = require('compression');
 const { Server } = require('socket.io');
 
 const game = require('./game');
@@ -12,18 +13,23 @@ const og = require('./og');
 const PORT = process.env.PORT || 3000;
 
 // Load dictionary
-const dictPath = path.join(__dirname, 'words.txt');
 const dictionary = new Set();
-{
-  const raw = fs.readFileSync(dictPath, 'utf8');
-  for (const line of raw.split(/\r?\n/)) {
+function loadWordsFrom(file) {
+  const full = path.join(__dirname, file);
+  if (!fs.existsSync(full)) return 0;
+  let added = 0;
+  for (const line of fs.readFileSync(full, 'utf8').split(/\r?\n/)) {
     const w = line.trim().toUpperCase();
-    if (w) dictionary.add(w);
+    if (w && !dictionary.has(w)) { dictionary.add(w); added++; }
   }
-  console.log(`Loaded ${dictionary.size} dictionary words.`);
+  return added;
 }
+loadWordsFrom('words.txt');
+const extra = loadWordsFrom('words-extra.txt');
+console.log(`Loaded ${dictionary.size} dictionary words (${extra} extras).`);
 
 const app = express();
+app.use(compression());
 // Trust the reverse-proxy (Railway edge) so req.protocol reflects the actual
 // scheme the client used, not the internal http hop. Without this, OG image
 // URLs come out http:// and most social previewers refuse mixed content.
@@ -147,6 +153,17 @@ app.get('/', (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.json({ ok: true, words: dictionary.size }));
+
+// Expose the word list to the client (compressed by middleware above).
+// Used to validate words client-side for live projected-score display.
+app.get('/words.txt', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(__dirname, 'words.txt'));
+});
+app.get('/words-extra.txt', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(path.join(__dirname, 'words-extra.txt'));
+});
 
 // --- Definitions ---
 // Look up word meanings via dictionaryapi.dev with an in-memory cache.

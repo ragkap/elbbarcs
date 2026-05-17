@@ -229,7 +229,36 @@ let prevTurn = null;
 let prevHistoryLen = 0;
 let prevOver = false;
 
+// Dictionary, loaded lazily once a game starts. Used for projected-score word validity.
+let clientDictionary = null;
+let dictionaryLoading = false;
+async function ensureDictionary() {
+  if (clientDictionary || dictionaryLoading) return;
+  dictionaryLoading = true;
+  try {
+    const [main, extra] = await Promise.all([
+      fetch('/words.txt').then(r => r.text()),
+      fetch('/words-extra.txt').then(r => r.text()).catch(() => '')
+    ]);
+    const set = new Set();
+    for (const line of main.split(/\r?\n/)) {
+      const w = line.trim().toUpperCase();
+      if (w) set.add(w);
+    }
+    for (const line of extra.split(/\r?\n/)) {
+      const w = line.trim().toUpperCase();
+      if (w) set.add(w);
+    }
+    clientDictionary = set;
+    updateProjectedScore();
+  } catch (e) {
+    // Network error — projected score will fall back to "calculating" without validity.
+    dictionaryLoading = false;
+  }
+}
+
 function renderState(s) {
+  ensureDictionary();
   const wasMine = prevTurn != null && prevTurn === s.you;
   const isMine = s.turn === s.you;
   const historyGrew = s.history.length > prevHistoryLen;
@@ -246,6 +275,7 @@ function renderState(s) {
   state.winner = s.winner;
   state.history = s.history;
   state.you = s.you;
+  state.moveNumber = s.moveNumber || 0;
   state.pending = []; // a fresh state from server clears any local pending move
 
   // Scoreboard
@@ -294,6 +324,7 @@ function renderState(s) {
   showScreen('game');
   renderBoard();
   renderRack();
+  updateProjectedScore();
 }
 
 function buildBoardOnce() {
@@ -441,7 +472,10 @@ function onMove(ev) {
   if (cell && !cell.querySelector('.tile')) {
     drag.dropTarget = cell;
     cell.classList.add('drop-target');
-  } else if (slot && !slot.querySelector('.tile')) {
+  } else if (slot) {
+    // Any rack slot is a valid drop. If it has a tile, we'll swap; if empty, we'll move into it.
+    // Skip if it's the slot we started from to avoid no-op drag visuals.
+    if (drag.source.kind === 'rack' && +slot.dataset.idx === drag.source.rackIndex) return;
     drag.dropTarget = slot;
     slot.classList.add('drop-target');
   }
@@ -465,7 +499,7 @@ function onEnd(ev) {
     const recall = !document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.rack, .board');
     if (recall && src.kind === 'board') {
       removePending(src.rackIndex);
-      renderBoard(); renderRack();
+      renderBoard(); renderRack(); updateProjectedScore();
     }
     return;
   }
@@ -477,11 +511,38 @@ function onEnd(ev) {
   } else if (target.classList.contains('rack-slot')) {
     const newIdx = +target.dataset.idx;
     if (src.kind === 'board') {
+      // Drag from board back to rack — recall this pending placement.
       removePending(src.rackIndex);
-      // Rack swap not strictly meaningful (the rack array is server-side). Just re-render.
-      renderBoard(); renderRack();
+      renderBoard(); renderRack(); updateProjectedScore();
+    } else if (src.kind === 'rack' && newIdx !== src.rackIndex) {
+      // Rack-to-rack: move the dragged tile to newIdx, shifting other tiles to make room.
+      // This keeps every tile's rackIndex consistent on the server (it's still the same
+      // letter at the same array position from the server's view — we just reorder our
+      // local copy and the pending placements that reference these indices).
+      reorderRack(src.rackIndex, newIdx);
+      renderRack();
     }
-    // Rack-to-rack rearrangement: visually-only nicety (skip here).
+  }
+}
+
+// Move state.rack[fromIdx] to position toIdx, shifting tiles between them.
+// Also remap rackIndex on any pending placements so they continue to point at the
+// same letter after reorder.
+function reorderRack(fromIdx, toIdx) {
+  if (fromIdx === toIdx) return;
+  const tile = state.rack[fromIdx];
+  // Remove from old position, insert at new
+  state.rack.splice(fromIdx, 1);
+  state.rack.splice(toIdx, 0, tile);
+  // Remap pending placements' rackIndex
+  for (const p of state.pending) {
+    if (p.rackIndex === fromIdx) {
+      p.rackIndex = toIdx;
+    } else if (fromIdx < toIdx && p.rackIndex > fromIdx && p.rackIndex <= toIdx) {
+      p.rackIndex -= 1;
+    } else if (fromIdx > toIdx && p.rackIndex >= toIdx && p.rackIndex < fromIdx) {
+      p.rackIndex += 1;
+    }
   }
 }
 
@@ -506,7 +567,7 @@ function placeTileFrom(src, row, col) {
     const p = state.pending.find(pp => pp.rackIndex === src.rackIndex);
     if (!p) return;
     p.row = row; p.col = col;
-    renderBoard(); renderRack();
+    renderBoard(); renderRack(); updateProjectedScore();
   }
 }
 
@@ -515,11 +576,58 @@ function addPending(p) {
   state.pending = state.pending.filter(pp => pp.rackIndex !== p.rackIndex);
   state.pending.push(p);
   Sounds.play('tilePlace');
-  renderBoard(); renderRack();
+  renderBoard(); renderRack(); updateProjectedScore(); updateProjectedScore();
 }
 function removePending(rackIndex) {
   state.pending = state.pending.filter(p => p.rackIndex !== rackIndex);
   Sounds.play('tileRecall');
+}
+
+function updateProjectedScore() {
+  const el = $('#projected-score');
+  if (!el) return;
+  if (!state.board || state.pending.length === 0) {
+    el.classList.add('hidden');
+    return;
+  }
+  const result = window.Scoring.projectScore({
+    board: state.board,
+    placements: state.pending.map(p => ({ row: p.row, col: p.col, letter: p.letter, blank: !!p.blank })),
+    moveNumber: state.moveNumber || 0,
+    dictionary: clientDictionary
+  });
+  el.classList.remove('hidden');
+
+  if (!result.ok) {
+    el.classList.remove('valid', 'invalid');
+    el.innerHTML = `<span>${escapeHtml(prettyReason(result.reason))}</span>`;
+    return;
+  }
+
+  const allValid = result.allWordsValid;
+  el.classList.toggle('valid', allValid === true);
+  el.classList.toggle('invalid', allValid === false);
+
+  const wordPills = result.words.map(w => {
+    const cls = w.valid === true ? 'good' : w.valid === false ? 'bad' : '';
+    return `<span class="word-pill ${cls}">${escapeHtml(w.word)} ·<strong>${w.score}</strong></span>`;
+  }).join('');
+
+  const bingoLabel = result.bingo ? '<span class="bingo-label">BINGO +50</span>' : '';
+  const status = allValid === true ? '✓' : allValid === false ? '✕' : '…';
+  el.innerHTML = `${wordPills}${bingoLabel}<span class="score-value">${status} ${result.score}</span>`;
+}
+
+function prettyReason(r) {
+  switch (r) {
+    case 'no tiles': return '';
+    case 'not a line': return 'Tiles must be in one row or column';
+    case 'gap': return 'Tiles must be contiguous';
+    case 'must cover center': return 'First word must cross the center ★';
+    case 'word must be >= 2 letters': return 'Word must be at least 2 letters';
+    case 'must connect to existing tiles': return 'Must connect to existing tiles';
+    default: return r || '';
+  }
 }
 
 // Tap on a placed pending tile to recall it
@@ -529,7 +637,7 @@ boardEl.addEventListener('click', (ev) => {
   const cell = tileEl.parentElement;
   const r = +cell.dataset.r, c = +cell.dataset.c;
   const p = state.pending.find(pp => pp.row === r && pp.col === c);
-  if (p) { removePending(p.rackIndex); renderBoard(); renderRack(); }
+  if (p) { removePending(p.rackIndex); renderBoard(); renderRack(); updateProjectedScore(); }
 });
 
 // Pointerdown on rack tiles starts a drag
@@ -555,7 +663,7 @@ boardEl.addEventListener('pointerdown', (ev) => {
 
 // --- Action buttons ---
 $('#recall-btn').addEventListener('click', () => {
-  state.pending = []; renderBoard(); renderRack();
+  state.pending = []; renderBoard(); renderRack(); updateProjectedScore();
 });
 $('#shuffle-btn').addEventListener('click', () => {
   // Visual rack shuffle only (rack order is local cosmetic)
@@ -572,7 +680,8 @@ $('#play-btn').addEventListener('click', () => {
   if (state.turn !== state.you) return toast("Not your turn", true);
   if (state.pending.length === 0) return toast("Place tiles first", true);
   const placements = state.pending.map(p => ({
-    row: p.row, col: p.col, letter: p.letter, rackIndex: p.rackIndex
+    row: p.row, col: p.col, letter: p.letter, rackIndex: p.rackIndex,
+    blank: !!p.blank // critical: tells server to consume a blank, not a letter tile
   }));
   state.socket.emit('move', { placements }, (res) => {
     if (!res.ok) return toast(res.reason, true);

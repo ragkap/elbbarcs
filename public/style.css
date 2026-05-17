@@ -310,6 +310,56 @@ button.flash.error {
   width: min(96vw, calc(100dvh - 220px), 720px);
   margin: 0 auto;
 }
+
+.projected-score {
+  background: var(--panel);
+  border: 1px solid #2c5742;
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  transition: border-color 0.15s, color 0.15s;
+}
+.projected-score.hidden { display: none; }
+.projected-score.valid {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.projected-score.invalid {
+  border-color: #6b1f1f;
+  color: #ffd2d2;
+}
+.projected-score .score-value {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--accent);
+  margin-left: auto;
+}
+.projected-score.invalid .score-value { color: #ff8a8a; }
+.projected-score .word-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #0e261b;
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.8rem;
+}
+.projected-score .word-pill.bad { background: #3a1414; color: #ffb0b0; }
+.projected-score .word-pill.good { background: #1a4533; color: #cfe9d4; }
+.projected-score .bingo-label {
+  background: var(--accent);
+  color: #1f1500;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
 .rack {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
