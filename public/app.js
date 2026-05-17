@@ -469,7 +469,8 @@ function onMove(ev) {
   if (!under) return;
   const cell = under.closest('.cell');
   const slot = under.closest('.rack-slot');
-  if (cell && !cell.querySelector('.tile')) {
+  // Board cells are only valid drop targets when it's your turn.
+  if (cell && !cell.querySelector('.tile') && state.turn === state.you) {
     drag.dropTarget = cell;
     cell.classList.add('drop-target');
   } else if (slot) {
@@ -644,7 +645,8 @@ boardEl.addEventListener('click', (ev) => {
 rackEl.addEventListener('pointerdown', (ev) => {
   const tile = ev.target.closest('.tile[data-rack-index]');
   if (!tile) return;
-  if (state.turn !== state.you) return;
+  // Rack reordering is always allowed (purely local). Board placement is
+  // still gated to your turn — enforced where the drop is resolved.
   const idx = +tile.dataset.rackIndex;
   startDrag(ev, tile, { kind: 'rack', rackIndex: idx });
 });
