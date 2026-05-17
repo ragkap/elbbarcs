@@ -3,7 +3,10 @@
 // Client-side projected score calculator. Mirrors game.js#validateAndScore.
 // Provides a quick, local check so the user sees their score as they place tiles.
 // The server is still the authority on move acceptance.
+// Wrapped in an IIFE so top-level consts (BOARD_SIZE, LETTER_VALUES, PREMIUM)
+// don't collide with the same names in app.js.
 
+(function () {
 const BOARD_SIZE = 15;
 
 const LETTER_VALUES = {
@@ -172,3 +175,4 @@ function projectScore({ board, placements, moveNumber, dictionary }) {
 }
 
 window.Scoring = { projectScore, LETTER_VALUES };
+})();
