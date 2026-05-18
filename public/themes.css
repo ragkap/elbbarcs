@@ -154,10 +154,9 @@
 }
 .theme-picker .row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
-  overflow-x: auto;
   padding: 2px;
-  -webkit-overflow-scrolling: touch;
 }
 .theme-chip {
   background: var(--panel);
