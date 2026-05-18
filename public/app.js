@@ -1309,6 +1309,22 @@ function connect() {
 
 connect();
 
+// Stale-HTML detector. If the cached index.html is from before a recent
+// markup change, references in app.js will silently fail. The presence of
+// the old .floating-controls wrapper is a reliable signal of the most
+// recent stale-HTML scenario; reload once to pick up the new HTML.
+(function checkStaleHtml() {
+  const stale = document.querySelector('.floating-controls');
+  if (stale && !sessionStorage.getItem('elbbarcs:reloaded')) {
+    sessionStorage.setItem('elbbarcs:reloaded', '1');
+    // Force a network fetch — the server now sets no-store, but old caches
+    // may still hold the HTML.
+    location.reload();
+  } else {
+    sessionStorage.removeItem('elbbarcs:reloaded');
+  }
+})();
+
 // When the page comes back to the foreground on mobile, force a socket check.
 // iOS Safari pauses background tabs and the socket can be silently dead until
 // the next ping; nudging it on visibilitychange makes recovery much faster.
