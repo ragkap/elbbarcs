@@ -495,6 +495,10 @@ function startDrag(ev, sourceEl, source) {
 function ensureGhost(ev) {
   if (drag.ghost || !drag.sourceEl) return;
   const g = drag.sourceEl.cloneNode(true);
+  // Strip state classes from the clone so .selected's lift-transform doesn't
+  // override the ghost's centering transform — that would put the ghost away
+  // from the finger and make drop targeting feel broken.
+  g.classList.remove('selected', 'fresh', 'last-move', 'placed');
   g.classList.add('drag-ghost');
   g.style.width = drag.width + 'px';
   g.style.height = drag.height + 'px';
@@ -514,6 +518,12 @@ function onMove(ev) {
     const dy = ev.clientY - drag.startY;
     if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
     drag.moved = true;
+    // Clear tap-selection state when a real drag begins so the source tile
+    // isn't stuck in its lifted/selected visual.
+    if (state.selectedRackIndex != null) {
+      state.selectedRackIndex = null;
+      renderRack();
+    }
     ensureGhost(ev);
   }
   drag.ghost.style.left = ev.clientX + 'px';
