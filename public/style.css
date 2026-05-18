@@ -521,6 +521,11 @@ button.flash.error {
 .row { display: flex; gap: 0.5rem; }
 .row > button { flex: 1; }
 
+/* Legacy floating-controls wrapper from old cached HTML — hide it entirely so
+   stale clients don't show a stranded Chat pill at the bottom-left. The chat
+   button gets re-mounted into the actions row by app.js when needed. */
+.floating-controls { display: none !important; }
+
 .badge {
   display: inline-flex;
   align-items: center; justify-content: center;

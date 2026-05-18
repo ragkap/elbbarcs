@@ -164,7 +164,16 @@ app.get('/', (req, res) => {
   res.end(html);
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Set short-lived cache on static assets. With version-stamped URLs we could
+// allow long caching, but until every client has loaded the new HTML at least
+// once we'd rather not cache anything aggressively. Re-validate every load.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (/\.(?:js|css|html|svg)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
+  }
+}));
 app.get('/health', (req, res) => res.json({ ok: true, words: dictionary.size }));
 
 // Expose the word list to the client (compressed by middleware above).
