@@ -126,6 +126,11 @@ function ogTags({ title, description, imageUrl }) {
 <meta name="twitter:image" content="${escapeHtml(imageUrl)}" />`;
 }
 
+// Boot timestamp — used as a cache-buster query string on static assets.
+// Every deploy gets a new value, so clients pick up fresh app.js/style.css
+// instead of risking a stale HTML/JS mismatch.
+const ASSET_VERSION = String(Date.now());
+
 app.get('/', (req, res) => {
   const room = (req.query.room || '').toString().toUpperCase().slice(0, 4);
   const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -145,11 +150,17 @@ app.get('/', (req, res) => {
       imageUrl: `${baseUrl}/og.png`
     });
   }
-  const html = indexHtml().replace(
+  let html = indexHtml().replace(
     /<!--OG_TAGS_START-->[\s\S]*?<!--OG_TAGS_END-->/,
     `<!--OG_TAGS_START-->\n${tags}\n<!--OG_TAGS_END-->`
   );
+  // Append ?v=<boot-ts> to local CSS/JS hrefs so a deploy invalidates client caches.
+  // Skip external URLs (e.g. /socket.io/socket.io.js — that's fine to cache).
+  html = html.replace(/(href|src)="(\/[^"?#]+\.(?:css|js|svg))"/g, `$1="$2?v=${ASSET_VERSION}"`);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  // Don't let intermediaries (or the browser) cache the HTML itself — it
+  // embeds the version stamp that controls staticasset cache busting.
+  res.setHeader('Cache-Control', 'no-store, must-revalidate');
   res.end(html);
 });
 
