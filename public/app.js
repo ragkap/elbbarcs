@@ -849,18 +849,31 @@ $('#pass-btn').addEventListener('click', () => {
 // --- Blank picker ---
 function promptBlank(cb) {
   const grid = $('#blank-letters');
-  const input = $('#blank-input');
-  input.value = '';
+  const input = $('#blank-input');     // may be null on a cached HTML missing the input
+  const confirmBtn = $('#blank-confirm');
+  if (!grid) {
+    // Fail loudly but recoverably — fall back to a plain prompt() so the user
+    // is never stuck. Picker DOM is missing entirely.
+    const v = (window.prompt('Choose a letter for the blank tile (A–Z)') || '').trim().toUpperCase();
+    if (/^[A-Z]$/.test(v)) cb(v);
+    return;
+  }
+  if (input) input.value = '';
   grid.innerHTML = '';
   // Live preview as user types — input also auto-confirms on first valid keystroke.
-  input.oninput = () => {
-    const v = (input.value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
-    input.value = v;
-    if (v) {
-      closeBlank();
-      cb(v);
-    }
-  };
+  if (input) {
+    input.oninput = () => {
+      const v = (input.value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+      input.value = v;
+      if (v) {
+        closeBlank();
+        cb(v);
+      }
+    };
+    input.onkeydown = (e) => {
+      if (e.key === 'Escape') closeBlank();
+    };
+  }
   for (let i = 0; i < 26; i++) {
     const ch = String.fromCharCode(65 + i);
     const b = document.createElement('button');
@@ -874,25 +887,26 @@ function promptBlank(cb) {
   // and feels broken. The alphabet grid is the primary path; the input is for
   // desktop users who'd rather type.
 
-  $('#blank-confirm').onclick = () => {
-    const v = (input.value || '').trim().toUpperCase();
-    if (!/^[A-Z]$/.test(v)) return;
-    closeBlank();
-    cb(v);
-  };
-  input.onkeydown = (e) => {
-    if (e.key === 'Escape') closeBlank();
-  };
+  if (confirmBtn) {
+    confirmBtn.onclick = () => {
+      const v = ((input && input.value) || '').trim().toUpperCase();
+      if (!/^[A-Z]$/.test(v)) return;
+      closeBlank();
+      cb(v);
+    };
+  }
 }
 function closeBlank() {
-  $('#blank-modal').classList.add('hidden');
+  const modal = $('#blank-modal');
+  if (modal) modal.classList.add('hidden');
   const input = $('#blank-input');
   if (input) {
     input.onkeydown = null;
     input.oninput = null;
   }
 }
-$('#blank-cancel').addEventListener('click', closeBlank);
+const blankCancelBtn = $('#blank-cancel');
+if (blankCancelBtn) blankCancelBtn.addEventListener('click', closeBlank);
 
 // --- End modal ---
 function showEndModal() {
