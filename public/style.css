@@ -183,10 +183,23 @@ body.autojoin-mode #autojoin-status { display: block; }
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin: 0.6rem 0;
 }
 
-/* Highlight the waiting-screen hint when the invite link was auto-copied. */
+/* Highlight the waiting-screen hint when the invite link was auto-copied
+   (or when we want the user to take an obvious next step). */
 .hint-success {
   color: var(--accent);
   font-weight: 700;
+}
+
+/* Draw attention to a specific button — used for Copy Link after Create
+   when auto-copy didn't run (most often on mobile). */
+button.attention {
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: attention-pulse 1.4s ease-in-out infinite;
+}
+@keyframes attention-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244, 201, 93, 0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(244, 201, 93, 0); }
 }
 .share-row button { padding: 0.6rem 0.4rem; font-size: 0.85rem; transition: background 0.15s, color 0.15s, transform 0.15s; }
 

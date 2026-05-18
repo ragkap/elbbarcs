@@ -68,10 +68,9 @@ $('#create-btn').addEventListener('click', () => {
     if (!res.ok) return toast(res.reason, true);
     state.code = res.code; state.you = res.you;
     enterWaiting();
-    // Try to auto-copy the invite link. Browsers gate clipboard writes to a
-    // direct user-gesture window, which the async server roundtrip may have
-    // closed, so this is best-effort. Surface either outcome to the user so
-    // they always know what happened.
+    // Try to auto-copy the invite link. Mobile browsers usually reject this
+    // because the user-gesture window expired during the server roundtrip;
+    // when that happens we draw the user's eye to the Copy Link button.
     let ok = false;
     try { ok = await copyText(shareLink()); } catch (e) {}
     const hint = $('#waiting-hint');
@@ -83,10 +82,15 @@ $('#create-btn').addEventListener('click', () => {
         hint.classList.add('hint-success');
       }
     } else {
-      // Couldn't auto-copy. Make the Copy Link button the call-to-action.
       if (hint) {
-        hint.textContent = 'Tap Copy Link to share with your opponent.';
-        hint.classList.remove('hint-success');
+        hint.textContent = '👇 Tap Copy Link to share with your opponent';
+        hint.classList.add('hint-success'); // gold so it's not missed on mobile
+      }
+      const copyBtn = $('#copy-link-btn');
+      if (copyBtn) {
+        copyBtn.classList.add('attention');
+        // Stop pulsing once the user actually taps it
+        copyBtn.addEventListener('click', () => copyBtn.classList.remove('attention'), { once: true });
       }
     }
   });
