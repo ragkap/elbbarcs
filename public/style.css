@@ -50,6 +50,9 @@ input { user-select: text; -webkit-user-select: text; }
 .screen { display: none; flex: 1; flex-direction: column; padding: 1rem; }
 .screen.active { display: flex; }
 
+/* Waiting screen contents shouldn't stretch edge-to-edge on a desktop window. */
+#waiting > * { max-width: 480px; width: 100%; margin-left: auto; margin-right: auto; }
+
 /* Lobby */
 .logo {
   font-size: 2.6rem;
@@ -545,10 +548,14 @@ button.flash.error {
 /* Chat */
 .chat-panel {
   position: fixed;
-  left: 0; right: 0;
+  left: 50%;
   bottom: 0;
+  transform: translateX(-50%);
+  width: min(96vw, 520px);
   background: var(--panel);
   border-top: 1px solid #2c5742;
+  border-left: 1px solid #2c5742;
+  border-right: 1px solid #2c5742;
   border-radius: 14px 14px 0 0;
   z-index: 160;
   padding: 0.5rem 0.6rem calc(0.6rem + var(--safe-bottom));
