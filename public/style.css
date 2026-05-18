@@ -433,10 +433,21 @@ button.flash.error {
 .rack-slot.drop-target { outline: 2px solid var(--accent); }
 
 .actions {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: auto repeat(4, 1fr);
   gap: 4px;
 }
-.actions button { padding: 0.6rem 0.4rem; font-size: 0.8rem; }
+.actions button { padding: 0.6rem 0.4rem; font-size: 0.8rem; position: relative; }
+/* Chat button is icon-only — keep it square and let the badge sit on the corner. */
+.actions #chat-toggle {
+  padding: 0.6rem 0.7rem;
+  font-size: 1.1rem;
+}
+.actions #chat-toggle .badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  margin: 0;
+}
 
 /* Floating dragged tile */
 .drag-ghost {
@@ -510,19 +521,6 @@ button.flash.error {
 .row { display: flex; gap: 0.5rem; }
 .row > button { flex: 1; }
 
-/* Floating controls (top-right of game screen) */
-.floating-controls {
-  position: fixed;
-  right: 0.5rem;
-  top: calc(0.5rem + var(--safe-top));
-  z-index: 6;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  align-items: flex-end;
-}
-.floating-controls button { padding: 0.4rem 0.6rem; font-size: 0.8rem; position: relative; }
-
 .badge {
   display: inline-flex;
   align-items: center; justify-content: center;
@@ -539,7 +537,6 @@ button.flash.error {
 .badge.hidden { display: none; }
 
 /* History */
-#history-toggle { /* now lives inside .floating-controls */ }
 .history-panel {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.85);

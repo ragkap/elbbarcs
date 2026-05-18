@@ -115,6 +115,7 @@
         <div id="projected-score" class="projected-score idle"><span class="placeholder">Place tiles to see your score</span></div>
         <div id="rack" class="rack"></div>
         <div class="actions">
+          <button id="chat-toggle" title="Chat with opponent">💬<span id="chat-badge" class="badge hidden">0</span></button>
           <button id="recall-btn" title="Return tiles to rack">↺ Recall</button>
           <button id="shuffle-btn" title="Shuffle rack">⇄ Shuffle</button>
           <button id="pass-btn" title="Pass turn">Pass</button>
@@ -123,10 +124,6 @@
       </div>
 
       <div id="message" class="message"></div>
-
-      <div class="floating-controls">
-        <button id="chat-toggle" class="ghost small">💬 Chat<span id="chat-badge" class="badge hidden">0</span></button>
-      </div>
 
       <div id="chat-panel" class="chat-panel hidden">
         <header class="chat-header">
