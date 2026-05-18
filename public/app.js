@@ -629,18 +629,23 @@ function handleTap(src, ev) {
 }
 
 // Listen for taps on empty board cells — if a rack tile is selected, place it.
-boardEl.addEventListener('click', (ev) => {
+// Use both 'click' (desktop) and 'pointerup' (mobile) since Safari sometimes
+// suppresses click on non-cursor:pointer elements.
+function handleBoardTap(ev) {
   const cell = ev.target.closest('.cell');
   if (!cell) return;
-  // If they tapped a pending tile, the existing handler above will recall it.
+  // Skip if the tap was actually on a pending tile (the other handler recalls it).
   if (cell.querySelector('.tile[data-pending]')) return;
+  // Skip if a drag is in progress / just ended.
+  if (drag && drag.moved) return;
   if (state.turn !== state.you) return;
   if (state.board[+cell.dataset.r][+cell.dataset.c]) return; // already a real tile
   if (state.selectedRackIndex == null) return;
   const idx = state.selectedRackIndex;
   state.selectedRackIndex = null;
   placeTileFrom({ kind: 'rack', rackIndex: idx }, +cell.dataset.r, +cell.dataset.c);
-});
+}
+boardEl.addEventListener('click', handleBoardTap);
 
 // Move state.rack[fromIdx] to position toIdx, shifting tiles between them.
 // Also remap rackIndex on any pending placements so they continue to point at the
@@ -665,13 +670,18 @@ function reorderRack(fromIdx, toIdx) {
 
 function placeTileFrom(src, row, col) {
   // Cannot place on existing board tile
-  if (state.board[row][col]) return;
+  if (state.board[row][col]) { toast('Square already occupied', true); return; }
   // Cannot place if not your turn
   if (state.turn !== state.you) { toast("It's not your turn", true); return; }
 
   if (src.kind === 'rack') {
     const rackIndex = src.rackIndex;
     const letter = state.rack[rackIndex];
+    if (letter == null) {
+      // Rack index now points to nothing (e.g. tile already pending). Bail with a message.
+      toast('That tile is no longer on the rack', true);
+      return;
+    }
     if (letter === '_') {
       promptBlank((chosen) => {
         addPending({ rackIndex, row, col, letter: chosen, blank: true });
@@ -764,9 +774,9 @@ function prettyReason(r) {
     case 'no tiles': return '';
     case 'not a line': return 'Tiles must be in one row or column';
     case 'gap': return 'Tiles must be contiguous';
-    case 'must cover center': return 'First word must cross the center ★';
-    case 'word must be >= 2 letters': return 'Word must be at least 2 letters';
-    case 'must connect to existing tiles': return 'Must connect to existing tiles';
+    case 'must cover center': return 'Place a tile on the center ★ to start';
+    case 'word must be >= 2 letters': return 'Add another tile — words must be 2+ letters';
+    case 'must connect to existing tiles': return 'Place a tile next to an existing word';
     default: return r || '';
   }
 }
