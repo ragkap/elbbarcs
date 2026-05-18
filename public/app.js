@@ -64,10 +64,20 @@ if (autoJoinRoom) {
 $('#create-btn').addEventListener('click', () => {
   const name = $('#name-input').value.trim() || 'Player 1';
   saveName(name);
-  state.socket.emit('create', { name }, (res) => {
+  state.socket.emit('create', { name }, async (res) => {
     if (!res.ok) return toast(res.reason, true);
     state.code = res.code; state.you = res.you;
     enterWaiting();
+    // Auto-copy the invite link so the host can immediately paste it.
+    // Best-effort — clipboard write may fail outside a user-gesture window;
+    // the Copy/Share buttons remain available as fallbacks.
+    try {
+      const ok = await copyText(shareLink());
+      if (ok) {
+        Sounds.play('copy');
+        toast('Invite link copied — paste it to your opponent');
+      }
+    } catch (e) { /* silently fall back */ }
   });
 });
 $('#join-btn').addEventListener('click', () => {
