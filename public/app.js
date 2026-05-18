@@ -683,21 +683,25 @@ function updateProjectedScore() {
   const el = $('#projected-score');
   const playBtn = $('#play-btn');
   if (!el) return;
+  // Always-on: keep the panel reserving layout space so the board doesn't jump
+  // when tiles are placed/recalled. Show a hint when there's nothing to score.
   if (!state.board || state.pending.length === 0) {
-    el.classList.add('hidden');
+    el.classList.remove('valid', 'invalid');
+    el.classList.add('idle');
+    el.innerHTML = '<span class="placeholder">Place tiles to see your score</span>';
     if (playBtn) {
       playBtn.disabled = true;
       playBtn.title = 'Place tiles first';
     }
     return;
   }
+  el.classList.remove('idle');
   const result = window.Scoring.projectScore({
     board: state.board,
     placements: state.pending.map(p => ({ row: p.row, col: p.col, letter: p.letter, blank: !!p.blank })),
     moveNumber: state.moveNumber || 0,
     dictionary: clientDictionary
   });
-  el.classList.remove('hidden');
 
   if (!result.ok) {
     el.classList.remove('valid', 'invalid');

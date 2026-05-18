@@ -366,7 +366,17 @@ button.flash.error {
   flex-wrap: wrap;
   transition: border-color 0.15s, color 0.15s;
 }
-.projected-score.hidden { display: none; }
+.projected-score.idle {
+  /* Dimmer when nothing's being scored — but still occupies the same vertical
+     space so the board / rack don't shift around. */
+  border-color: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.35);
+  background: transparent;
+}
+.projected-score .placeholder {
+  font-style: italic;
+  font-size: 0.8rem;
+}
 .projected-score.valid {
   border-color: var(--accent);
   color: var(--text);
