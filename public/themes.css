@@ -1,0 +1,180 @@
+/* Themed palettes. Default (classic) lives in style.css :root.
+   Each theme overrides CSS variables and optionally adds decorative touches. */
+
+/* ─── Christmas ───────────────────────────────────────────── */
+.theme-christmas {
+  --bg: #1a0d0d;
+  --bg-2: #2d1414;
+  --panel: #3a1a1a;
+  --board-bg: #120808;
+  --text: #fdf6e8;
+  --muted: #e8c4c4;
+  --accent: #f4c95d;          /* gold */
+  --accent-strong: #ffd97a;
+  --tile: #f7e7c1;            /* cream-gold */
+  --tile-edge: #b89456;
+  --tile-text: #2a1505;
+  --tw: #c52030;              /* candy-cane red */
+  --dw: #e08891;
+  --tl: #1f6f3d;              /* pine green */
+  --dl: #7fb594;
+  --center: #f4c95d;          /* star — gold */
+}
+/* Snowflake corner watermark */
+.theme-christmas::before {
+  content: "❄";
+  position: fixed;
+  top: calc(0.4rem + var(--safe-top));
+  left: 0.6rem;
+  font-size: 1.4rem;
+  color: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  z-index: 1;
+}
+.theme-christmas::after {
+  content: "❄";
+  position: fixed;
+  bottom: calc(0.4rem + var(--safe-bottom));
+  right: 0.6rem;
+  font-size: 1.4rem;
+  color: rgba(255, 255, 255, 0.18);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ─── Halloween ───────────────────────────────────────────── */
+.theme-halloween {
+  --bg: #0a0a0e;
+  --bg-2: #14101c;
+  --panel: #1f1830;
+  --board-bg: #060509;
+  --text: #f4ede0;
+  --muted: #b8a8c4;
+  --accent: #ff8c1a;          /* pumpkin orange */
+  --accent-strong: #ffaa3d;
+  --tile: #ffd590;            /* pumpkin flesh */
+  --tile-edge: #b8732a;
+  --tile-text: #2a1500;
+  --tw: #8c2a8a;              /* witch purple */
+  --dw: #b366b0;
+  --tl: #1a8c3a;              /* poison green */
+  --dl: #6cc28c;
+  --center: #ff8c1a;
+}
+.theme-halloween::before {
+  content: "🎃";
+  position: fixed;
+  top: calc(0.4rem + var(--safe-top));
+  left: 0.5rem;
+  font-size: 1.4rem;
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ─── Valentine's ─────────────────────────────────────────── */
+.theme-valentines {
+  --bg: #1f0a14;
+  --bg-2: #3a1428;
+  --panel: #4a1c34;
+  --board-bg: #140510;
+  --text: #fdeef0;
+  --muted: #e5b8c8;
+  --accent: #ffb3c6;          /* pink */
+  --accent-strong: #ff80a0;
+  --tile: #fde2dc;            /* blush cream */
+  --tile-edge: #c47889;
+  --tile-text: #3a0a1c;
+  --tw: #c4264a;              /* rose red */
+  --dw: #e88aa2;
+  --tl: #8a3a5c;              /* deep mauve */
+  --dl: #c479a0;
+  --center: #ff4d7d;
+}
+.theme-valentines::before {
+  content: "♥";
+  position: fixed;
+  top: calc(0.4rem + var(--safe-top));
+  left: 0.6rem;
+  font-size: 1.4rem;
+  color: rgba(255, 128, 160, 0.45);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ─── Diwali ──────────────────────────────────────────────── */
+.theme-diwali {
+  --bg: #1a0f24;
+  --bg-2: #2d1a3d;
+  --panel: #3d2552;
+  --board-bg: #130a1a;
+  --text: #ffeacc;
+  --muted: #d8c4a0;
+  --accent: #ffb84d;          /* marigold */
+  --accent-strong: #ffd680;
+  --tile: #f4d28c;            /* warm gold tile */
+  --tile-edge: #a8773e;
+  --tile-text: #2a1500;
+  --tw: #d6452b;              /* deep red */
+  --dw: #f0a18b;
+  --tl: #cc8a00;              /* saffron */
+  --dl: #ffd680;
+  --center: #ffb84d;
+}
+.theme-diwali::before {
+  content: "✦";
+  position: fixed;
+  top: calc(0.4rem + var(--safe-top));
+  left: 0.6rem;
+  font-size: 1.3rem;
+  color: rgba(255, 184, 77, 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
+.theme-diwali::after {
+  content: "✦";
+  position: fixed;
+  bottom: calc(0.4rem + var(--safe-bottom));
+  right: 0.6rem;
+  font-size: 1.3rem;
+  color: rgba(255, 184, 77, 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ─── Theme picker on lobby ───────────────────────────────── */
+.theme-picker {
+  margin: 0.8rem auto 0;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.theme-picker .row {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  padding: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+.theme-chip {
+  background: var(--panel);
+  border: 1px solid #2c5742;
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform 0.08s, border-color 0.15s;
+}
+.theme-chip:active { transform: scale(0.96); }
+.theme-chip.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #1f1500;
+  font-weight: 700;
+}

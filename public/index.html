@@ -24,6 +24,27 @@
 <meta name="twitter:image" content="/og.png" />
 <!--OG_TAGS_END-->
 <link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="/themes.css" />
+<script>
+// Apply saved or seasonal theme to <html> immediately to avoid FOUC.
+(function () {
+  try {
+    const saved = localStorage.getItem('elbbarcs:theme');
+    const valid = ['classic','christmas','halloween','valentines','diwali'];
+    let t = valid.includes(saved) ? saved : null;
+    if (!t) {
+      const d = new Date(), m = d.getMonth() + 1, day = d.getDate();
+      if (m === 12 || (m === 1 && day <= 5)) t = 'christmas';
+      else if ((m === 10 && day >= 20) || (m === 11 && day <= 5)) t = 'halloween';
+      else if (m === 11 && day >= 6 && day <= 20) t = 'diwali';
+      else if (m === 2 && day >= 7 && day <= 17) t = 'valentines';
+      else t = 'classic';
+    }
+    if (t !== 'classic') document.documentElement.classList.add('theme-' + t);
+  } catch (e) {}
+})();
+</script>
+<script src="/themes.js" defer></script>
 </head>
 <body>
   <div id="app">
@@ -47,6 +68,11 @@
           <input id="code-input" maxlength="4" placeholder="ABCD" autocomplete="off" autocapitalize="characters" />
         </label>
         <button id="join-btn" class="primary">Join game</button>
+      </div>
+
+      <div class="theme-picker">
+        <label>Board theme</label>
+        <div id="theme-row" class="row"></div>
       </div>
 
       <p class="footer dedication">For my wife.<br>My favourite word, best teammate, and highest-scoring move in life.</p>
