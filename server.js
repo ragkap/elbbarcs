@@ -41,13 +41,16 @@ app.set('trust proxy', true);
 // since social-media preview scrapers (Slack/Facebook/LinkedIn) treat strict
 // X-Robots-Tag values as a signal to skip the image entirely.
 const OG_IMAGE_PATHS = new Set(['/og.png']);
+const ROBOTS_EXEMPT = new Set(['/robots.txt', '/favicon.svg', '/health']);
 app.use((req, res, next) => {
   const isOgImage = OG_IMAGE_PATHS.has(req.path) || req.path.startsWith('/og/');
-  if (!isOgImage) {
+  const isExempt = ROBOTS_EXEMPT.has(req.path);
+  if (!isOgImage && !isExempt) {
     // Use the minimum directives that achieve SEO-privacy: 'noindex, nofollow'.
     // Stricter values (noarchive/nosnippet/noimageindex) cause some OG preview
     // scrapers (Facebook, LinkedIn) to skip the page entirely, breaking link
-    // previews. The OG image endpoints themselves are already excluded above.
+    // previews. robots.txt itself is also exempt so crawlers don't see a
+    // conflicting signal when fetching it.
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   }
   next();

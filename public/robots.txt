@@ -3,37 +3,43 @@
 # so OG cards still render when the URL is shared.
 
 User-agent: facebookexternalhit
-Disallow:
+Allow: /
+
+User-agent: facebookexternalhit/1.1
+Allow: /
 
 User-agent: facebookcatalog
-Disallow:
+Allow: /
 
 User-agent: Facebot
-Disallow:
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
 
 User-agent: LinkedInBot
-Disallow:
+Allow: /
 
 User-agent: Twitterbot
-Disallow:
+Allow: /
 
 User-agent: WhatsApp
-Disallow:
+Allow: /
 
 User-agent: Slackbot
-Disallow:
+Allow: /
 
 User-agent: Slackbot-LinkExpanding
-Disallow:
+Allow: /
 
 User-agent: TelegramBot
-Disallow:
+Allow: /
 
 User-agent: Discordbot
-Disallow:
+Allow: /
 
 User-agent: SkypeUriPreview
-Disallow:
+Allow: /
 
 User-agent: *
 Disallow: /
