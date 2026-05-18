@@ -556,9 +556,20 @@ function onEnd(ev) {
   }
 
   if (!target) {
-    // No valid drop. If dropped well outside the rack/board, recall to rack.
-    const recall = !document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.rack, .board');
-    if (recall && src.kind === 'board') {
+    // No valid drop. Figure out where the user dropped to give helpful feedback.
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    const overBoard = under?.closest('.board');
+    const overRack = under?.closest('.rack');
+    if (overBoard) {
+      // They tried to drop on the board.
+      if (state.turn !== state.you) {
+        toast("It's not your turn yet", true);
+      } else {
+        // Either an occupied cell or somewhere ambiguous — tell them.
+        toast('Drop on an empty square', true);
+      }
+    } else if (!overBoard && !overRack && src.kind === 'board') {
+      // Dropped well outside the rack/board — recall the pending tile.
       removePending(src.rackIndex);
       renderBoard(); renderRack(); updateProjectedScore();
     }
