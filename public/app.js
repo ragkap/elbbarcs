@@ -441,8 +441,12 @@ function renderRack() {
     const tile = state.rack[i];
     const usedHere = state.pending.find(p => p.rackIndex === i);
     if (tile && !usedHere) {
-      const t = makeTileEl(tile === '_' ? ' ' : tile, tile === '_', false);
+      // Blanks display as a star — visually distinct from a missing tile, and the
+      // chosen letter gets shown after placement (with .blank styling).
+      const display = tile === '_' ? '★' : tile;
+      const t = makeTileEl(display, tile === '_', false);
       t.dataset.rackIndex = i;
+      if (tile === '_') t.title = 'Blank tile — choose its letter when placing';
       if (state.selectedRackIndex === i) t.classList.add('selected');
       slot.appendChild(t);
     } else {
@@ -811,8 +815,16 @@ function promptBlank(cb) {
   const grid = $('#blank-letters');
   const input = $('#blank-input');
   input.value = '';
-  // Render alphabet chips beneath the input so users can tap as before
   grid.innerHTML = '';
+  // Live preview as user types — input also auto-confirms on first valid keystroke.
+  input.oninput = () => {
+    const v = (input.value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+    input.value = v;
+    if (v) {
+      closeBlank();
+      cb(v);
+    }
+  };
   for (let i = 0; i < 26; i++) {
     const ch = String.fromCharCode(65 + i);
     const b = document.createElement('button');
@@ -822,25 +834,27 @@ function promptBlank(cb) {
     grid.appendChild(b);
   }
   $('#blank-modal').classList.remove('hidden');
-  setTimeout(() => input.focus(), 30);
+  // Don't try to auto-focus on mobile — it doesn't always trigger the keyboard
+  // and feels broken. The alphabet grid is the primary path; the input is for
+  // desktop users who'd rather type.
 
-  const confirm = () => {
+  $('#blank-confirm').onclick = () => {
     const v = (input.value || '').trim().toUpperCase();
-    if (!/^[A-Z]$/.test(v)) { input.focus(); return; }
+    if (!/^[A-Z]$/.test(v)) return;
     closeBlank();
     cb(v);
   };
-  // Re-bind so we always use the current callback
-  $('#blank-confirm').onclick = confirm;
   input.onkeydown = (e) => {
-    if (e.key === 'Enter') confirm();
-    else if (e.key === 'Escape') closeBlank();
+    if (e.key === 'Escape') closeBlank();
   };
 }
 function closeBlank() {
   $('#blank-modal').classList.add('hidden');
   const input = $('#blank-input');
-  if (input) input.onkeydown = null;
+  if (input) {
+    input.onkeydown = null;
+    input.oninput = null;
+  }
 }
 $('#blank-cancel').addEventListener('click', closeBlank);
 
