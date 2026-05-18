@@ -74,15 +74,20 @@ $('#create-btn').addEventListener('click', () => {
     // they always know what happened.
     let ok = false;
     try { ok = await copyText(shareLink()); } catch (e) {}
+    const hint = $('#waiting-hint');
     if (ok) {
       Sounds.play('copy');
       toast('Invite link copied — paste it to your opponent');
-      const hint = $('#waiting-hint');
-      if (hint) hint.textContent = '✓ Invite link copied. Paste it to your opponent.';
+      if (hint) {
+        hint.textContent = '✓ Invite link copied. Paste it to your opponent.';
+        hint.classList.add('hint-success');
+      }
     } else {
       // Couldn't auto-copy. Make the Copy Link button the call-to-action.
-      const hint = $('#waiting-hint');
-      if (hint) hint.textContent = 'Tap Copy Link to share with your opponent.';
+      if (hint) {
+        hint.textContent = 'Tap Copy Link to share with your opponent.';
+        hint.classList.remove('hint-success');
+      }
     }
   });
 });

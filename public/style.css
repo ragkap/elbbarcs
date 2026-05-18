@@ -182,6 +182,12 @@ body.autojoin-mode #autojoin-status { display: block; }
 .share-row {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.4rem; margin: 0.6rem 0;
 }
+
+/* Highlight the waiting-screen hint when the invite link was auto-copied. */
+.hint-success {
+  color: var(--accent);
+  font-weight: 700;
+}
 .share-row button { padding: 0.6rem 0.4rem; font-size: 0.85rem; transition: background 0.15s, color 0.15s, transform 0.15s; }
 
 /* Action feedback flash — gives the user a clear "yes, it worked" cue. */
