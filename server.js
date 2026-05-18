@@ -290,6 +290,20 @@ function findPlayerIndex(room, socketId) {
   return room.players.findIndex(p => p.socketId === socketId);
 }
 
+// Server-driven auto-start. Removes the dependency on the host's client
+// being responsive enough to emit 'start' itself (backgrounded mobile tabs
+// throttle JS and the original client-side auto-start can stall).
+function maybeAutoStart(room) {
+  if (!room || room.state) return;
+  if (room.players.length < 2) return;
+  // Wait until both slots are filled with live sockets so we don't start
+  // a game one side can't see (mid-disconnect window).
+  if (!room.players.every(p => p.socketId)) return;
+  room.state = game.createGame(room.players.map(p => ({ id: p.id, name: p.name })));
+  console.log(`[room] auto-started ${room.code}`);
+  broadcastRoom(room);
+}
+
 // Simple token-bucket rate limiter, keyed per socket per event type.
 // Generous defaults so legitimate fast-fingered play is never throttled;
 // blocks runaway scripts / spam.
@@ -353,6 +367,7 @@ io.on('connection', (socket) => {
       socket.join(code);
       ack && ack({ ok: true, code, you: vacantSameName });
       broadcastRoom(room);
+      maybeAutoStart(room);
       return;
     }
 
@@ -365,6 +380,7 @@ io.on('connection', (socket) => {
       socket.join(code);
       ack && ack({ ok: true, code, you: vacantAny });
       broadcastRoom(room);
+      maybeAutoStart(room);
       return;
     }
 
@@ -375,6 +391,11 @@ io.on('connection', (socket) => {
     socket.join(code);
     ack && ack({ ok: true, code, you: room.players.length - 1 });
     broadcastRoom(room);
+    // Server-side auto-start: as soon as the room hits 2 players with no game
+    // in progress, kick it off. Removes the dependency on the host's browser
+    // being responsive enough to emit 'start' (which can fail on backgrounded
+    // mobile tabs).
+    maybeAutoStart(room);
   });
 
   socket.on('start', (_data, ack) => {
@@ -633,6 +654,7 @@ io.on('connection', (socket) => {
       io.to(socket.id).emit('state', game.publicView(room.state, slot));
     } else {
       broadcastRoom(room);
+      maybeAutoStart(room);
     }
     // Tell the other player that this player came back
     for (const p of room.players) {
