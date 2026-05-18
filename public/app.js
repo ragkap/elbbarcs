@@ -278,6 +278,7 @@ function renderState(s) {
   state.history = s.history;
   state.you = s.you;
   state.moveNumber = s.moveNumber || 0;
+  state.lastMove = s.lastMove || null;
   state.pending = []; // a fresh state from server clears any local pending move
 
   // Scoreboard — animate when a score actually changes
