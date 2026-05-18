@@ -270,9 +270,35 @@ function findPlayerIndex(room, socketId) {
   return room.players.findIndex(p => p.socketId === socketId);
 }
 
+// Simple token-bucket rate limiter, keyed per socket per event type.
+// Generous defaults so legitimate fast-fingered play is never throttled;
+// blocks runaway scripts / spam.
+const RATE_LIMITS = {
+  move: { capacity: 8, refillPerSec: 2 },        // up to 8 moves burst, refill 2/sec
+  pass: { capacity: 4, refillPerSec: 1 },
+  chat: { capacity: 10, refillPerSec: 2 },
+  reaction: { capacity: 12, refillPerSec: 4 },
+  exchange: { capacity: 4, refillPerSec: 1 }
+};
+function makeRateLimiter() {
+  const buckets = {};
+  return function consume(kind) {
+    const lim = RATE_LIMITS[kind];
+    if (!lim) return true;
+    const now = Date.now();
+    const b = buckets[kind] || (buckets[kind] = { tokens: lim.capacity, last: now });
+    const elapsed = (now - b.last) / 1000;
+    b.tokens = Math.min(lim.capacity, b.tokens + elapsed * lim.refillPerSec);
+    b.last = now;
+    if (b.tokens >= 1) { b.tokens -= 1; return true; }
+    return false;
+  };
+}
+
 io.on('connection', (socket) => {
   let joinedRoom = null;
   let playerId = null;
+  const rateOk = makeRateLimiter();
 
   socket.on('create', ({ name }, ack) => {
     if (joinedRoom) return ack && ack({ ok: false, reason: 'Already in a room' });
@@ -343,6 +369,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('move', ({ placements }, ack) => {
+    if (!rateOk('move')) return ack && ack({ ok: false, reason: 'Slow down' });
     if (!joinedRoom) return ack && ack({ ok: false, reason: 'No room' });
     const room = rooms.get(joinedRoom);
     if (!room || !room.state) return ack && ack({ ok: false, reason: 'No game' });
@@ -413,6 +440,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('pass', (_data, ack) => {
+    if (!rateOk('pass')) return ack && ack({ ok: false, reason: 'Slow down' });
     if (!joinedRoom) return ack && ack({ ok: false, reason: 'No room' });
     const room = rooms.get(joinedRoom);
     if (!room || !room.state) return ack && ack({ ok: false, reason: 'No game' });
@@ -424,6 +452,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('exchange', ({ rackIndices }, ack) => {
+    if (!rateOk('exchange')) return ack && ack({ ok: false, reason: 'Slow down' });
     if (!joinedRoom) return ack && ack({ ok: false, reason: 'No room' });
     const room = rooms.get(joinedRoom);
     if (!room || !room.state) return ack && ack({ ok: false, reason: 'No game' });
@@ -436,6 +465,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chat', ({ text }) => {
+    if (!rateOk('chat')) return;
     if (!joinedRoom) return;
     const room = rooms.get(joinedRoom);
     if (!room) return;
@@ -447,6 +477,89 @@ io.on('connection', (socket) => {
       at: Date.now()
     };
     for (const p of room.players) io.to(p.socketId).emit('chat', msg);
+  });
+
+  // Quick reactions: small transient emoji that flies across both screens.
+  // Stateless, no chat-log entry, no persistence — just a visual flourish.
+  socket.on('reaction', ({ emoji }) => {
+    if (!rateOk('reaction')) return;
+    if (!joinedRoom) return;
+    const room = rooms.get(joinedRoom);
+    if (!room) return;
+    const me = findPlayerIndex(room, socket.id);
+    if (me < 0) return;
+    const ALLOWED = ['👏','🔥','🤔','😂','😅','❤️','💀','🎉','👀','🤯'];
+    const e = String(emoji || '').trim();
+    if (!ALLOWED.includes(e)) return;
+    for (const p of room.players) {
+      if (p.socketId) io.to(p.socketId).emit('reaction', { from: me, emoji: e });
+    }
+  });
+
+  // Rematch: when the game is over, either player can request a rematch.
+  // We create a fresh room (with a new code) seeded with the same players;
+  // both clients receive a 'rematch-ready' event with the new code so they
+  // can transition together without re-typing names.
+  socket.on('rematch', (_data, ack) => {
+    if (!joinedRoom) return ack && ack({ ok: false, reason: 'No room' });
+    const room = rooms.get(joinedRoom);
+    if (!room || !room.state || !room.state.over) {
+      return ack && ack({ ok: false, reason: 'Game not over' });
+    }
+    // If a rematch was already created for this game, surface it again
+    if (room.rematchCode && rooms.get(room.rematchCode)) {
+      const next = rooms.get(room.rematchCode);
+      // Move requesting socket into the next room if they're not already
+      for (const np of next.players) {
+        if (np.socketId === socket.id) {
+          // already in
+          joinedRoom = room.rematchCode;
+          ack && ack({ ok: true, code: room.rematchCode });
+          return;
+        }
+      }
+      // Take the first vacant slot matching the player's name
+      const me = findPlayerIndex(room, socket.id);
+      const myName = me >= 0 ? room.players[me].name : null;
+      const slot = next.players.findIndex(p => !p.socketId && p.name === myName);
+      if (slot >= 0) {
+        next.players[slot].socketId = socket.id;
+        joinedRoom = room.rematchCode;
+        socket.join(room.rematchCode);
+        ack && ack({ ok: true, code: room.rematchCode });
+        broadcastRoom(next);
+        return;
+      }
+      return ack && ack({ ok: false, reason: 'Rematch room full' });
+    }
+    // First rematch request — create a new room with both players in their
+    // current slots, and start the game immediately if both are connected.
+    const newCode = genCode();
+    const me = findPlayerIndex(room, socket.id);
+    const players = room.players.map((p, i) => ({
+      id: socket.id + '-' + Date.now() + '-' + i,
+      name: p.name,
+      socketId: i === me ? socket.id : null
+    }));
+    const newRoom = {
+      code: newCode,
+      players,
+      state: null,
+      createdAt: Date.now()
+    };
+    rooms.set(newCode, newRoom);
+    room.rematchCode = newCode;
+    socket.join(newCode);
+    joinedRoom = newCode;
+    ack && ack({ ok: true, code: newCode });
+    // Tell the OTHER player a rematch is ready so their client can rejoin.
+    for (const p of room.players) {
+      if (p.socketId && p.socketId !== socket.id) {
+        io.to(p.socketId).emit('rematch-ready', { code: newCode });
+      }
+    }
+    broadcastRoom(newRoom);
+    store.saveRoom(room); // persist rematchCode pointer on the old room
   });
 
   socket.on('disconnect', () => {

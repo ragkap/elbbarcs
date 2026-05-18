@@ -24,6 +24,7 @@ const state = {
   winner: null,
   // local placement state for current pending move
   pending: [],          // [{rackIndex, row, col, letter, blank}]
+  selectedRackIndex: null, // rack index currently selected for tap-to-place
   history: []
 };
 
@@ -263,6 +264,7 @@ function renderState(s) {
   const isMine = s.turn === s.you;
   const historyGrew = s.history.length > prevHistoryLen;
   const justEnded = s.over && !prevOver;
+  const prevScores = state.scores ? state.scores.slice() : [0, 0];
 
   state.board = s.board;
   state.rack = s.rack || [];
@@ -278,11 +280,17 @@ function renderState(s) {
   state.moveNumber = s.moveNumber || 0;
   state.pending = []; // a fresh state from server clears any local pending move
 
-  // Scoreboard
+  // Scoreboard — animate when a score actually changes
   for (let i = 0; i < 2; i++) {
     const el = $('#p' + i + '-score');
     el.querySelector('.name').textContent = s.players[i] ? s.players[i].name : '—';
-    el.querySelector('.val').textContent = s.scores[i];
+    const valEl = el.querySelector('.val');
+    const newScore = s.scores[i];
+    if (prevScores[i] !== newScore && prevScores[i] != null) {
+      animateScoreTo(valEl, prevScores[i], newScore);
+    } else {
+      valEl.textContent = newScore;
+    }
     el.classList.toggle('active', s.turn === i && !s.over);
   }
   bagEl.textContent = s.bagCount;
@@ -295,6 +303,9 @@ function renderState(s) {
   }
 
   if (historyGrew && s.lastMove) {
+    // New move arrived — clear the animated-already set so the fresh tiles get
+    // the drop-in + last-move highlight on render.
+    resetLastMoveAnimation();
     if (s.lastMove.type === 'move') {
       const who = s.players[s.lastMove.player].name;
       toast(`${who} played ${s.lastMove.words[0].word} for ${s.lastMove.score}`);
@@ -354,6 +365,11 @@ function premiumLabel(p) {
 function renderBoard() {
   buildBoardOnce();
   const cells = boardEl.children;
+  // Build set of "last move" cell keys so opponent's freshly placed tiles glow.
+  const lastMoveCells = new Set();
+  if (state.lastMove && state.lastMove.type === 'move' && state.lastMove.placements) {
+    for (const p of state.lastMove.placements) lastMoveCells.add(p.row + ',' + p.col);
+  }
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
       const cell = cells[r * BOARD_SIZE + c];
@@ -369,7 +385,13 @@ function renderBoard() {
 
       const onBoard = state.board[r][c];
       if (onBoard) {
-        cell.appendChild(makeTileEl(onBoard.letter, onBoard.blank, false));
+        const tile = makeTileEl(onBoard.letter, onBoard.blank, false);
+        const key = r + ',' + c;
+        if (lastMoveCells.has(key) && !renderedLastMove.has(key)) {
+          tile.classList.add('placed', 'last-move');
+          renderedLastMove.add(key);
+        }
+        cell.appendChild(tile);
       } else {
         const pending = state.pending.find(p => p.row === r && p.col === c);
         if (pending) {
@@ -384,6 +406,10 @@ function renderBoard() {
     }
   }
 }
+// Cells we've already animated for the current "last move" — prevents
+// re-triggering the animation when renderBoard runs again during the same move.
+let renderedLastMove = new Set();
+function resetLastMoveAnimation() { renderedLastMove = new Set(); }
 
 function makeTileEl(letter, blank, fresh, isPending = false) {
   const t = document.createElement('div');
@@ -401,6 +427,13 @@ function makeTileEl(letter, blank, fresh, isPending = false) {
 
 function renderRack() {
   rackEl.innerHTML = '';
+  // If the currently-selected rack index has been emptied (because the tile was
+  // placed or the rack was reordered), clear selection.
+  if (state.selectedRackIndex != null) {
+    const t = state.rack[state.selectedRackIndex];
+    const used = state.pending.find(p => p.rackIndex === state.selectedRackIndex);
+    if (!t || used) state.selectedRackIndex = null;
+  }
   for (let i = 0; i < 7; i++) {
     const slot = document.createElement('div');
     slot.className = 'rack-slot';
@@ -410,6 +443,7 @@ function renderRack() {
     if (tile && !usedHere) {
       const t = makeTileEl(tile === '_' ? ' ' : tile, tile === '_', false);
       t.dataset.rackIndex = i;
+      if (state.selectedRackIndex === i) t.classList.add('selected');
       slot.appendChild(t);
     } else {
       slot.classList.add('empty');
@@ -428,54 +462,69 @@ function getRackTileAt(touch) {
   return tile;
 }
 
+// Distance (px) the pointer must travel before we consider a press to be a drag.
+// Below this threshold we treat pointerup as a tap and route it through the
+// tap-to-place flow instead of running drop logic.
+const DRAG_THRESHOLD = 8;
+
 function startDrag(ev, sourceEl, source) {
   ev.preventDefault();
   const rect = sourceEl.getBoundingClientRect();
   drag = {
-    source,           // {kind: 'rack', rackIndex} or {kind: 'board', row, col, rackIndex}
+    source,
     sourceEl,
     pointerId: ev.pointerId,
     ghost: null,
     width: rect.width,
     height: rect.height,
-    dropTarget: null
+    dropTarget: null,
+    startX: ev.clientX,
+    startY: ev.clientY,
+    moved: false
   };
-  // Build ghost
-  const g = sourceEl.cloneNode(true);
-  g.classList.add('drag-ghost');
-  g.style.width = rect.width + 'px';
-  g.style.height = rect.height + 'px';
-  g.style.left = ev.clientX + 'px';
-  g.style.top = ev.clientY + 'px';
-  document.body.appendChild(g);
-  drag.ghost = g;
-  sourceEl.style.opacity = '0.25';
-
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onEnd);
   document.addEventListener('pointercancel', onEnd);
 }
 
+function ensureGhost(ev) {
+  if (drag.ghost || !drag.sourceEl) return;
+  const g = drag.sourceEl.cloneNode(true);
+  g.classList.add('drag-ghost');
+  g.style.width = drag.width + 'px';
+  g.style.height = drag.height + 'px';
+  g.style.left = ev.clientX + 'px';
+  g.style.top = ev.clientY + 'px';
+  document.body.appendChild(g);
+  drag.ghost = g;
+  drag.sourceEl.style.opacity = '0.25';
+}
+
 function onMove(ev) {
   if (!drag) return;
+  // Hold off building the ghost until the pointer crosses a threshold —
+  // so brief taps don't visually flash a dragged tile.
+  if (!drag.moved) {
+    const dx = ev.clientX - drag.startX;
+    const dy = ev.clientY - drag.startY;
+    if (dx * dx + dy * dy < DRAG_THRESHOLD * DRAG_THRESHOLD) return;
+    drag.moved = true;
+    ensureGhost(ev);
+  }
   drag.ghost.style.left = ev.clientX + 'px';
   drag.ghost.style.top = ev.clientY + 'px';
   drag.ghost.style.display = 'none';
   const under = document.elementFromPoint(ev.clientX, ev.clientY);
   drag.ghost.style.display = '';
-  // Identify drop target: a board cell or rack slot
   if (drag.dropTarget) drag.dropTarget.classList.remove('drop-target');
   drag.dropTarget = null;
   if (!under) return;
   const cell = under.closest('.cell');
   const slot = under.closest('.rack-slot');
-  // Board cells are only valid drop targets when it's your turn.
   if (cell && !cell.querySelector('.tile') && state.turn === state.you) {
     drag.dropTarget = cell;
     cell.classList.add('drop-target');
   } else if (slot) {
-    // Any rack slot is a valid drop. If it has a tile, we'll swap; if empty, we'll move into it.
-    // Skip if it's the slot we started from to avoid no-op drag visuals.
     if (drag.source.kind === 'rack' && +slot.dataset.idx === drag.source.rackIndex) return;
     drag.dropTarget = slot;
     slot.classList.add('drop-target');
@@ -489,11 +538,17 @@ function onEnd(ev) {
   document.removeEventListener('pointercancel', onEnd);
   const target = drag.dropTarget;
   const src = drag.source;
+  const wasTap = !drag.moved;
   if (target) target.classList.remove('drop-target');
   if (drag.ghost) drag.ghost.remove();
   if (drag.sourceEl) drag.sourceEl.style.opacity = '';
-  const dragRef = drag;
   drag = null;
+
+  // Tap behavior: select or place via the tap-to-place flow rather than running drop logic.
+  if (wasTap) {
+    handleTap(src, ev);
+    return;
+  }
 
   if (!target) {
     // No valid drop. If dropped well outside the rack/board, recall to rack.
@@ -525,6 +580,41 @@ function onEnd(ev) {
     }
   }
 }
+
+// --- Tap-to-place ---
+// state.selectedRackIndex is the rack tile awaiting placement.
+function handleTap(src, ev) {
+  // Tap on a rack tile: select/deselect it (or place if a board cell was tapped — handled below).
+  if (src.kind === 'rack') {
+    if (state.selectedRackIndex === src.rackIndex) {
+      state.selectedRackIndex = null; // toggle off
+    } else {
+      state.selectedRackIndex = src.rackIndex;
+    }
+    renderRack();
+    return;
+  }
+  // Tap on a pending board tile: recall it.
+  if (src.kind === 'board') {
+    removePending(src.rackIndex);
+    renderBoard(); renderRack(); updateProjectedScore();
+    return;
+  }
+}
+
+// Listen for taps on empty board cells — if a rack tile is selected, place it.
+boardEl.addEventListener('click', (ev) => {
+  const cell = ev.target.closest('.cell');
+  if (!cell) return;
+  // If they tapped a pending tile, the existing handler above will recall it.
+  if (cell.querySelector('.tile[data-pending]')) return;
+  if (state.turn !== state.you) return;
+  if (state.board[+cell.dataset.r][+cell.dataset.c]) return; // already a real tile
+  if (state.selectedRackIndex == null) return;
+  const idx = state.selectedRackIndex;
+  state.selectedRackIndex = null;
+  placeTileFrom({ kind: 'rack', rackIndex: idx }, +cell.dataset.r, +cell.dataset.c);
+});
 
 // Move state.rack[fromIdx] to position toIdx, shifting tiles between them.
 // Also remap rackIndex on any pending placements so they continue to point at the
@@ -586,9 +676,14 @@ function removePending(rackIndex) {
 
 function updateProjectedScore() {
   const el = $('#projected-score');
+  const playBtn = $('#play-btn');
   if (!el) return;
   if (!state.board || state.pending.length === 0) {
     el.classList.add('hidden');
+    if (playBtn) {
+      playBtn.disabled = true;
+      playBtn.title = 'Place tiles first';
+    }
     return;
   }
   const result = window.Scoring.projectScore({
@@ -602,6 +697,10 @@ function updateProjectedScore() {
   if (!result.ok) {
     el.classList.remove('valid', 'invalid');
     el.innerHTML = `<span>${escapeHtml(prettyReason(result.reason))}</span>`;
+    if (playBtn) {
+      playBtn.disabled = true;
+      playBtn.title = prettyReason(result.reason);
+    }
     return;
   }
 
@@ -617,6 +716,17 @@ function updateProjectedScore() {
   const bingoLabel = result.bingo ? '<span class="bingo-label">BINGO +50</span>' : '';
   const status = allValid === true ? '✓' : allValid === false ? '✕' : '…';
   el.innerHTML = `${wordPills}${bingoLabel}<span class="score-value">${status} ${result.score}</span>`;
+
+  if (playBtn) {
+    // Allow Play if every formed word is in the dictionary, OR the dictionary
+    // hasn't loaded yet (let the server be authoritative). Disable when any
+    // word is known-invalid.
+    const blocked = allValid === false;
+    playBtn.disabled = blocked || state.turn !== state.you;
+    playBtn.title = blocked
+      ? 'One of these isn\'t a valid word'
+      : state.turn !== state.you ? 'Not your turn' : 'Submit move';
+  }
 }
 
 function prettyReason(r) {
@@ -699,17 +809,39 @@ $('#pass-btn').addEventListener('click', () => {
 // --- Blank picker ---
 function promptBlank(cb) {
   const grid = $('#blank-letters');
+  const input = $('#blank-input');
+  input.value = '';
+  // Render alphabet chips beneath the input so users can tap as before
   grid.innerHTML = '';
   for (let i = 0; i < 26; i++) {
     const ch = String.fromCharCode(65 + i);
     const b = document.createElement('button');
     b.textContent = ch;
+    b.type = 'button';
     b.addEventListener('click', () => { closeBlank(); cb(ch); });
     grid.appendChild(b);
   }
   $('#blank-modal').classList.remove('hidden');
+  setTimeout(() => input.focus(), 30);
+
+  const confirm = () => {
+    const v = (input.value || '').trim().toUpperCase();
+    if (!/^[A-Z]$/.test(v)) { input.focus(); return; }
+    closeBlank();
+    cb(v);
+  };
+  // Re-bind so we always use the current callback
+  $('#blank-confirm').onclick = confirm;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') confirm();
+    else if (e.key === 'Escape') closeBlank();
+  };
 }
-function closeBlank() { $('#blank-modal').classList.add('hidden'); }
+function closeBlank() {
+  $('#blank-modal').classList.add('hidden');
+  const input = $('#blank-input');
+  if (input) input.onkeydown = null;
+}
 $('#blank-cancel').addEventListener('click', closeBlank);
 
 // --- End modal ---
@@ -723,7 +855,57 @@ function showEndModal() {
   $('#end-scores').innerHTML = state.scores
     .map((s, i) => `<div>${escapeHtml(state.players[i].name)}: <strong>${s}</strong></div>`)
     .join('');
-  $('#end-rematch').onclick = () => location.reload();
+  $('#rematch-status').classList.add('hidden');
+  $('#end-rematch').disabled = false;
+  $('#end-rematch').textContent = '↻ Rematch';
+  $('#end-rematch').onclick = () => requestRematch();
+  $('#end-lobby').onclick = () => location.reload();
+}
+
+function requestRematch() {
+  const btn = $('#end-rematch');
+  btn.disabled = true;
+  btn.textContent = 'Asking opponent…';
+  $('#rematch-status').textContent = 'Waiting for opponent to accept…';
+  $('#rematch-status').classList.remove('hidden');
+  state.socket.emit('rematch', {}, (res) => {
+    if (!res.ok) {
+      toast(res.reason || 'Could not start rematch', true);
+      btn.disabled = false;
+      btn.textContent = '↻ Rematch';
+      $('#rematch-status').classList.add('hidden');
+      return;
+    }
+    // Switch our local state to the new room. Server will broadcast the new
+    // lobby state (with us as the only player so far) which closes this modal
+    // automatically once the opponent joins and the game starts.
+    state.code = res.code;
+    state.you = 0;
+    enterWaiting();
+    $('#end-modal').classList.add('hidden');
+  });
+}
+
+// Handle incoming rematch invitation from the opponent.
+function showRematchInvite(code) {
+  const modal = $('#rematch-invite');
+  modal.classList.remove('hidden');
+  $('#rematch-accept').onclick = () => {
+    modal.classList.add('hidden');
+    state.socket.emit('join', { code, name: state.myName }, (res) => {
+      if (!res.ok) {
+        toast(res.reason || 'Could not join rematch', true);
+        return;
+      }
+      state.code = res.code;
+      state.you = res.you;
+      $('#end-modal').classList.add('hidden');
+      enterWaiting();
+    });
+  };
+  $('#rematch-decline').onclick = () => {
+    modal.classList.add('hidden');
+  };
 }
 
 // --- Toast ---
@@ -734,6 +916,25 @@ function toast(msg, isError = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => messageEl.classList.remove('show'), 2200);
   if (isError) Sounds.play('error');
+}
+
+// Tween a score display from one number to another over ~600ms with a
+// brief "changing" class for the CSS pulse.
+function animateScoreTo(el, from, to) {
+  const start = performance.now();
+  const dur = 600;
+  el.classList.add('changing');
+  function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if (t < 1) requestAnimationFrame(step);
+    else {
+      el.textContent = to;
+      setTimeout(() => el.classList.remove('changing'), 100);
+    }
+  }
+  requestAnimationFrame(step);
 }
 
 function escapeHtml(s) {
@@ -814,6 +1015,46 @@ function wireChat() {
     state.socket.emit('chat', { text });
     input.value = '';
   });
+
+  // Reaction row
+  const reactionRow = $('#reaction-row');
+  if (reactionRow && !reactionRow.dataset.wired) {
+    reactionRow.dataset.wired = '1';
+    const REACTIONS = ['👏','🔥','🤔','😂','😅','❤️','💀','🎉','👀','🤯'];
+    for (const emoji of REACTIONS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = emoji;
+      b.addEventListener('click', () => sendReaction(emoji));
+      reactionRow.appendChild(b);
+    }
+  }
+}
+
+function sendReaction(emoji) {
+  state.socket.emit('reaction', { emoji });
+  // Show locally immediately for snappiness; server echoes to peer.
+  floatReaction(emoji, true);
+}
+
+function onIncomingReaction({ from, emoji }) {
+  // Don't render our own echoed reaction twice
+  if (from === state.you) return;
+  floatReaction(emoji, false);
+}
+
+function floatReaction(emoji, mine) {
+  const layer = $('#reaction-layer');
+  if (!layer) return;
+  const el = document.createElement('div');
+  el.className = 'reaction-float';
+  el.textContent = emoji;
+  // Mine: bottom-right; theirs: bottom-left — gives a visual sense of "who sent it".
+  const x = mine ? 75 + Math.random() * 15 : 10 + Math.random() * 15;
+  el.style.left = `${x}vw`;
+  el.style.bottom = `12vh`;
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 2400);
 }
 
 // --- Peer status ---
@@ -969,6 +1210,10 @@ function connect() {
     Sounds.play('peerBack');
     addSystemChat(`${display} rejoined`);
   });
+  state.socket.on('rematch-ready', ({ code }) => {
+    showRematchInvite(code);
+  });
+  state.socket.on('reaction', onIncomingReaction);
   state.socket.on('disconnect', (reason) => {
     // 'io server disconnect' is intentional (server kicked us); everything else
     // is a network/transport blip and the client will auto-reconnect.

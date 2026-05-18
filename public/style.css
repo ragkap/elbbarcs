@@ -287,6 +287,44 @@ button.flash.error {
 }
 .tile.fresh { outline: 2px solid var(--accent-strong); }
 .tile.blank { color: #874a00; font-style: italic; }
+/* Tile is selected (tap-to-place) — lift and glow so the user sees what they tapped. */
+.tile.selected {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: -1px;
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.55), inset 0 -2px 0 var(--tile-edge);
+  z-index: 3;
+}
+/* Animate freshly placed tiles dropping in. The .placed class is added by JS
+   when an opponent's move arrives, then removed after the animation. */
+.tile.placed { animation: tile-drop 0.32s cubic-bezier(.34,1.56,.64,1); }
+@keyframes tile-drop {
+  0%   { transform: scale(1.6); opacity: 0; }
+  60%  { transform: scale(0.92); opacity: 1; }
+  100% { transform: scale(1); }
+}
+/* Last-move highlight: opponent's tiles pulse softly so you can see what changed. */
+.tile.last-move {
+  box-shadow: inset 0 -2px 0 var(--tile-edge), 0 0 0 2px var(--accent-strong),
+              0 0 12px rgba(255, 179, 71, 0.6);
+  animation: last-move-pulse 1.6s ease-in-out 2;
+}
+@keyframes last-move-pulse {
+  0%, 100% { box-shadow: inset 0 -2px 0 var(--tile-edge), 0 0 0 2px var(--accent-strong), 0 0 6px rgba(255, 179, 71, 0.4); }
+  50%      { box-shadow: inset 0 -2px 0 var(--tile-edge), 0 0 0 3px var(--accent-strong), 0 0 16px rgba(255, 179, 71, 0.8); }
+}
+/* Score counter animation — used by JS to flash when the score changes. */
+.score .val {
+  transition: color 0.2s;
+}
+.score .val.changing {
+  color: var(--accent-strong);
+  animation: score-bump 0.5s ease-out;
+}
+@keyframes score-bump {
+  0%, 100% { transform: scale(1); }
+  40%      { transform: scale(1.25); }
+}
 .tile .pts {
   position: absolute;
   bottom: 1px; right: 2px;
@@ -434,6 +472,15 @@ button.flash.error {
   width: 360px;
   display: flex; flex-direction: column; gap: 0.8rem;
 }
+#blank-input {
+  width: 100%;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.7rem;
+}
 .blank-grid {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
 }
@@ -560,6 +607,54 @@ button.flash.error {
   font-size: 0.95rem;
 }
 .chat-form button { padding: 0.6rem 0.9rem; }
+
+/* Quick reactions row: emoji buttons inside the chat panel */
+.reaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: 0.3rem;
+}
+.reaction-row button {
+  background: #0e261b;
+  border: 1px solid #2c5742;
+  font-size: 1.2rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 8px;
+  line-height: 1;
+}
+.reaction-row button:active { transform: scale(0.9); }
+
+/* Floating reaction layer — emoji float up briefly when sent or received */
+.reaction-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 250;
+  overflow: hidden;
+}
+.reaction-float {
+  position: absolute;
+  font-size: 3rem;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+  animation: reaction-float 2.2s ease-out forwards;
+}
+@keyframes reaction-float {
+  0%   { transform: translateY(0) scale(0.4); opacity: 0; }
+  15%  { transform: translateY(-20px) scale(1.2); opacity: 1; }
+  50%  { transform: translateY(-90px) scale(1); opacity: 1; }
+  100% { transform: translateY(-180px) scale(0.85); opacity: 0; }
+}
+
+/* Rematch */
+.rematch-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0;
+}
 
 /* Peer status banner */
 .peer-status {

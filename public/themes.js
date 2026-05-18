@@ -7,6 +7,7 @@
 (function () {
   const THEMES = [
     { id: 'classic',    label: '🟢 Classic' },
+    { id: 'light',      label: '☀️ Light' },
     { id: 'christmas',  label: '🎄 Christmas' },
     { id: 'halloween',  label: '🎃 Halloween' },
     { id: 'valentines', label: '💝 Valentine\'s' },
@@ -22,6 +23,10 @@
     if ((m === 10 && d >= 20) || (m === 11 && d <= 5)) return 'halloween';
     if (m === 11 && d >= 6 && d <= 20)             return 'diwali';
     if (m === 2 && d >= 7 && d <= 17)              return 'valentines';
+    // Respect OS-level light-mode preference when no holiday matches.
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return 'light';
+    }
     return 'classic';
   }
 

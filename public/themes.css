@@ -142,6 +142,54 @@
   z-index: 1;
 }
 
+/* ─── Light ───────────────────────────────────────────────── */
+.theme-light {
+  --bg: #f4f1e8;
+  --bg-2: #ece7d6;
+  --panel: #ffffff;
+  --board-bg: #e0d9c4;
+  --text: #1f1f1f;
+  --muted: #6a6258;
+  --accent: #c87b1f;            /* warm amber */
+  --accent-strong: #e6932f;
+  --tile: #f1d899;
+  --tile-edge: #a87b3a;
+  --tile-text: #2a1d05;
+  --tw: #d6452b;
+  --dw: #f0a18b;
+  --tl: #1f6feb;
+  --dl: #8ec5ff;
+  --center: #f0a18b;
+}
+/* Inverted panel borders/inputs for light mode readability */
+.theme-light input,
+.theme-light input[type=text],
+.theme-light input:not([type]) {
+  background: #fdfbf4;
+  color: #1f1f1f;
+  border: 1px solid #d0c8b4;
+}
+.theme-light button {
+  background: #ece7d6;
+  color: #1f1f1f;
+}
+.theme-light button.ghost {
+  background: transparent;
+  border: 1px solid #d0c8b4;
+}
+.theme-light .topbar,
+.theme-light .rack-area {
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+}
+.theme-light .bag-info { background: #ece7d6; }
+.theme-light .cell { background: #f4eed8; color: rgba(0,0,0,0.5); }
+.theme-light .definitions { background: #ffffff; }
+.theme-light .chat-panel { background: #ffffff; }
+.theme-light .chat-messages li { background: #ece7d6; color: #1f1f1f; }
+.theme-light .projected-score { background: #fff8e0; color: #1f1f1f; border-color: #d0c8b4; }
+.theme-light .projected-score .word-pill { background: #ece7d6; }
+.theme-light .projected-score.valid { border-color: var(--accent); color: #1f1f1f; }
+
 /* ─── Theme picker on lobby ───────────────────────────────── */
 .theme-picker {
   margin: 0.8rem auto 0;
