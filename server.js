@@ -120,17 +120,23 @@ function escapeHtml(s) {
   }[ch]));
 }
 
-function ogTags({ title, description, imageUrl }) {
+function ogTags({ title, description, imageUrl, pageUrl }) {
   return `<meta property="og:type" content="website" />
+<meta property="og:site_name" content="elbbarcs" />
 <meta property="og:title" content="${escapeHtml(title)}" />
 <meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:url" content="${escapeHtml(pageUrl)}" />
 <meta property="og:image" content="${escapeHtml(imageUrl)}" />
+<meta property="og:image:secure_url" content="${escapeHtml(imageUrl)}" />
+<meta property="og:image:type" content="image/png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="${escapeHtml(title)}" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${escapeHtml(title)}" />
 <meta name="twitter:description" content="${escapeHtml(description)}" />
-<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />`;
+<meta name="twitter:image" content="${escapeHtml(imageUrl)}" />
+<meta name="twitter:image:alt" content="${escapeHtml(title)}" />`;
 }
 
 // Boot timestamp — used as a cache-buster query string on static assets.
@@ -148,13 +154,15 @@ app.get('/', (req, res) => {
     tags = ogTags({
       title: `${inviter} invited you to elbbarcs`,
       description: `Tap to join room ${room}.`,
-      imageUrl: `${baseUrl}/og/invite.png?room=${encodeURIComponent(room)}`
+      imageUrl: `${baseUrl}/og/invite.png?room=${encodeURIComponent(room)}`,
+      pageUrl: `${baseUrl}/?room=${encodeURIComponent(room)}`
     });
   } else {
     tags = ogTags({
       title: 'elbbarcs',
       description: 'two players · two phones · one love for words',
-      imageUrl: `${baseUrl}/og.png`
+      imageUrl: `${baseUrl}/og.png`,
+      pageUrl: `${baseUrl}/`
     });
   }
   let html = indexHtml().replace(
