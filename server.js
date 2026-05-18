@@ -44,7 +44,11 @@ const OG_IMAGE_PATHS = new Set(['/og.png']);
 app.use((req, res, next) => {
   const isOgImage = OG_IMAGE_PATHS.has(req.path) || req.path.startsWith('/og/');
   if (!isOgImage) {
-    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    // Use the minimum directives that achieve SEO-privacy: 'noindex, nofollow'.
+    // Stricter values (noarchive/nosnippet/noimageindex) cause some OG preview
+    // scrapers (Facebook, LinkedIn) to skip the page entirely, breaking link
+    // previews. The OG image endpoints themselves are already excluded above.
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   }
   next();
 });
@@ -146,7 +150,7 @@ app.get('/', (req, res) => {
   } else {
     tags = ogTags({
       title: 'elbbarcs',
-      description: 'two players · one phone · love for words',
+      description: 'two players · two phones · one love for words',
       imageUrl: `${baseUrl}/og.png`
     });
   }
