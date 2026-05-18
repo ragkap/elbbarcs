@@ -58,7 +58,7 @@ function homepageOG() {
   ${wordRow(word, startX, tileY, tileSize)}
   <text x="${W / 2}" y="${tileY + tileSize + 80}" font-family="-apple-system, Helvetica, Arial, sans-serif"
         font-size="38" font-weight="500" fill="#b8c4ad" text-anchor="middle">
-    two players · one phone · love for words
+    two players · two phones · one love for words
   </text>
   <text x="${W / 2}" y="${tileY + tileSize + 140}" font-family="-apple-system, Helvetica, Arial, sans-serif"
         font-size="28" font-weight="400" fill="#f4c95d" text-anchor="middle" font-style="italic">
@@ -67,20 +67,17 @@ function homepageOG() {
 </svg>`;
 }
 
-// --- Invite card: shows the inviter's name spelled in tiles, with a CTA ---
+// --- Invite card: ELBBARCS spelled in tiles + inviter name in text ---
 function inviteOG(inviterName, code) {
-  const name = (inviterName || 'Someone').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 10) || 'PLAYER';
-  // Size tiles so the name fits comfortably across the canvas, max 110, min 70.
-  const maxNameWidth = W - 200;
+  const word = 'ELBBARCS';
+  const tileSize = 110;
   const gap = 8;
-  let tileSize = Math.min(110, Math.floor((maxNameWidth - (name.length - 1) * gap) / name.length));
-  if (tileSize < 70) tileSize = 70;
-  const totalW = name.length * tileSize + (name.length - 1) * gap;
+  const totalW = word.length * tileSize + (word.length - 1) * gap;
   const startX = (W - totalW) / 2;
   const tileY = 130;
 
   const safeCode = escapeXml(String(code || '').toUpperCase().slice(0, 4));
-  const displayName = escapeXml(inviterName || 'Someone');
+  const displayName = escapeXml(inviterName || 'A friend');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
@@ -91,17 +88,13 @@ function inviteOG(inviterName, code) {
     </linearGradient>
   </defs>
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
-  ${wordRow(name, startX, tileY, tileSize)}
-  <text x="${W / 2}" y="${tileY + tileSize + 80}" font-family="-apple-system, Helvetica, Arial, sans-serif"
-        font-size="44" font-weight="700" fill="#f4ede0" text-anchor="middle">
-    ${displayName} has invited you to a game
+  ${wordRow(word, startX, tileY, tileSize)}
+  <text x="${W / 2}" y="${tileY + tileSize + 90}" font-family="-apple-system, Helvetica, Arial, sans-serif"
+        font-size="48" font-weight="700" fill="#f4ede0" text-anchor="middle">
+    ${displayName} has invited you to play
   </text>
-  <text x="${W / 2}" y="${tileY + tileSize + 140}" font-family="-apple-system, Helvetica, Arial, sans-serif"
-        font-size="56" font-weight="800" fill="#f4c95d" text-anchor="middle">
-    of elbbarcs
-  </text>
-  <text x="${W / 2}" y="${tileY + tileSize + 210}" font-family="-apple-system, Helvetica, Arial, sans-serif"
-        font-size="32" font-weight="500" fill="#b8c4ad" text-anchor="middle">
+  <text x="${W / 2}" y="${tileY + tileSize + 160}" font-family="-apple-system, Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="500" fill="#f4c95d" text-anchor="middle">
     tap to join · room ${safeCode}
   </text>
 </svg>`;
