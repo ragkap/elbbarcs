@@ -68,16 +68,22 @@ $('#create-btn').addEventListener('click', () => {
     if (!res.ok) return toast(res.reason, true);
     state.code = res.code; state.you = res.you;
     enterWaiting();
-    // Auto-copy the invite link so the host can immediately paste it.
-    // Best-effort — clipboard write may fail outside a user-gesture window;
-    // the Copy/Share buttons remain available as fallbacks.
-    try {
-      const ok = await copyText(shareLink());
-      if (ok) {
-        Sounds.play('copy');
-        toast('Invite link copied — paste it to your opponent');
-      }
-    } catch (e) { /* silently fall back */ }
+    // Try to auto-copy the invite link. Browsers gate clipboard writes to a
+    // direct user-gesture window, which the async server roundtrip may have
+    // closed, so this is best-effort. Surface either outcome to the user so
+    // they always know what happened.
+    let ok = false;
+    try { ok = await copyText(shareLink()); } catch (e) {}
+    if (ok) {
+      Sounds.play('copy');
+      toast('Invite link copied — paste it to your opponent');
+      const hint = $('#waiting-hint');
+      if (hint) hint.textContent = '✓ Invite link copied. Paste it to your opponent.';
+    } else {
+      // Couldn't auto-copy. Make the Copy Link button the call-to-action.
+      const hint = $('#waiting-hint');
+      if (hint) hint.textContent = 'Tap Copy Link to share with your opponent.';
+    }
   });
 });
 $('#join-btn').addEventListener('click', () => {
