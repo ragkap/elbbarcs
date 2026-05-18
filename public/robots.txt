@@ -1,45 +1,7 @@
-# Block search-engine indexing, but allow link-preview scrapers
-# (Facebook, LinkedIn, Twitter, WhatsApp, Slack, Telegram, etc.)
-# so OG cards still render when the URL is shared.
-
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: facebookexternalhit/1.1
-Allow: /
-
-User-agent: facebookcatalog
-Allow: /
-
-User-agent: Facebot
-Allow: /
-
-User-agent: meta-externalagent
-Allow: /
-
-User-agent: LinkedInBot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: WhatsApp
-Allow: /
-
-User-agent: Slackbot
-Allow: /
-
-User-agent: Slackbot-LinkExpanding
-Allow: /
-
-User-agent: TelegramBot
-Allow: /
-
-User-agent: Discordbot
-Allow: /
-
-User-agent: SkypeUriPreview
-Allow: /
+# Allow everything. The page is not intended for indexing, but in
+# practice noindex/Disallow blocked link-preview scrapers (Facebook,
+# Twitter) and the URL is non-discoverable anyway. Plain allow keeps
+# previews working everywhere.
 
 User-agent: *
-Disallow: /
+Allow: /

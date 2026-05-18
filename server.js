@@ -37,24 +37,11 @@ app.use(compression());
 // URLs come out http:// and most social previewers refuse mixed content.
 app.set('trust proxy', true);
 
-// Block search engines on HTML pages — but NOT on the OG image endpoints,
-// since social-media preview scrapers (Slack/Facebook/LinkedIn) treat strict
-// X-Robots-Tag values as a signal to skip the image entirely.
-const OG_IMAGE_PATHS = new Set(['/og.png']);
-const ROBOTS_EXEMPT = new Set(['/robots.txt', '/favicon.svg', '/health']);
-app.use((req, res, next) => {
-  const isOgImage = OG_IMAGE_PATHS.has(req.path) || req.path.startsWith('/og/');
-  const isExempt = ROBOTS_EXEMPT.has(req.path);
-  if (!isOgImage && !isExempt) {
-    // Use the minimum directives that achieve SEO-privacy: 'noindex, nofollow'.
-    // Stricter values (noarchive/nosnippet/noimageindex) cause some OG preview
-    // scrapers (Facebook, LinkedIn) to skip the page entirely, breaking link
-    // previews. robots.txt itself is also exempt so crawlers don't see a
-    // conflicting signal when fetching it.
-    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
-  }
-  next();
-});
+// SEO-privacy: rely on the non-discoverability of the Railway subdomain
+// rather than X-Robots-Tag. Facebook's scraper refused to render a preview
+// for pages carrying any noindex directive — even though noindex is a search
+// engine concept, not a scraping concept. Stripping the header so previews
+// work everywhere. (The meta tags in index.html are also removed.)
 
 // --- Open Graph / Twitter card images ---
 // Cache rendered PNGs in memory so messengers (which hit the URL multiple times)
